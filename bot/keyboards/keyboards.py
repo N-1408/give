@@ -10,6 +10,8 @@
 # 📋 CHANGE LOG:
 # [2026-03-15 09:18 Tashkent] - Removed Top referallar & Adminga murojaat
 #   from menu. Added admin reply keyboard. Simplified main menu to 2 rows.
+# [2026-03-15 09:40 Tashkent] - Updated admin menu: renamed Broadcast
+#   to Barchaga xabar yuborish, swapped positions, removed user menus.
 # ============================================
 
 from aiogram.types import (
@@ -142,24 +144,18 @@ def get_admin_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
     menus = {
         "uz": [
             ["📊 Statistika", "📥 Excel yuklab olish"],
-            ["📢 Broadcast", "🔄 Kanal sozlamalari"],
-            ["📝 Textlarni o'zgartirish"],
-            ["🎟️ Mening imkoniyatlarim", "🔗 Referal linkim"],
-            ["📋 Qoidalar", "🎁 Sovrinlar"],
+            ["📝 Textlarni o'zgartirish", "🔄 Kanal sozlamalari"],
+            ["📣 Barchaga xabar yuborish"],
         ],
         "ru": [
             ["📊 Статистика", "📥 Скачать Excel"],
-            ["📢 Рассылка", "🔄 Каналы"],
-            ["📝 Редактировать тексты"],
-            ["🎟️ Мои шансы", "🔗 Моя реферальная ссылка"],
-            ["📋 Правила", "🎁 Призы"],
+            ["📝 Редактировать тексты", "🔄 Каналы"],
+            ["📣 Сделать рассылку"],
         ],
         "en": [
             ["📊 Statistics", "📥 Download Excel"],
-            ["📢 Broadcast", "🔄 Channel settings"],
-            ["📝 Edit texts"],
-            ["🎟️ My chances", "🔗 My referral link"],
-            ["📋 Rules", "🎁 Prizes"],
+            ["📝 Edit texts", "🔄 Channel settings"],
+            ["📣 Broadcast message"],
         ]
     }
 
@@ -180,7 +176,7 @@ def get_admin_keyboard(language: str = "uz") -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stats")],
             [InlineKeyboardButton(text="📝 Textlarni o'zgartirish", callback_data="admin_edit_texts")],
             [InlineKeyboardButton(text="📥 Excel yuklab olish", callback_data="admin_export")],
-            [InlineKeyboardButton(text="📢 Xabar yuborish (Broadcast)", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="📣 Barchaga xabar yuborish", callback_data="admin_broadcast")],
             [InlineKeyboardButton(text="🔄 Kanal sozlamalari", callback_data="admin_channels")],
             [InlineKeyboardButton(text="🔙 Orqaga", callback_data="admin_close")],
         ],
@@ -188,7 +184,7 @@ def get_admin_keyboard(language: str = "uz") -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
             [InlineKeyboardButton(text="📝 Редактировать тексты", callback_data="admin_edit_texts")],
             [InlineKeyboardButton(text="📥 Скачать Excel", callback_data="admin_export")],
-            [InlineKeyboardButton(text="📢 Рассылка (Broadcast)", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="📣 Сделать рассылку", callback_data="admin_broadcast")],
             [InlineKeyboardButton(text="🔄 Настройки каналов", callback_data="admin_channels")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_close")],
         ],
@@ -196,7 +192,7 @@ def get_admin_keyboard(language: str = "uz") -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📊 Statistics", callback_data="admin_stats")],
             [InlineKeyboardButton(text="📝 Edit texts", callback_data="admin_edit_texts")],
             [InlineKeyboardButton(text="📥 Download Excel", callback_data="admin_export")],
-            [InlineKeyboardButton(text="📢 Broadcast message", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="📣 Broadcast message", callback_data="admin_broadcast")],
             [InlineKeyboardButton(text="🔄 Channel settings", callback_data="admin_channels")],
             [InlineKeyboardButton(text="🔙 Back", callback_data="admin_close")],
         ]

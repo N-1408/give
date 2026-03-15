@@ -229,6 +229,7 @@ async def on_admin_export_reply(message: Message, bot: Bot, lang: str = "uz"):
 
 
 @router.message(F.text.in_({
+    "📣 Barchaga xabar yuborish", "📣 Сделать рассылку", "📣 Broadcast message",
     "📢 Broadcast", "📢 Рассылка"
 }))
 async def on_admin_broadcast_reply(message: Message, state: FSMContext, lang: str = "uz"):
