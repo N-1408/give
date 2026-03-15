@@ -637,43 +637,55 @@ async def on_channel_url_entered(message: Message, state: FSMContext, lang: str 
 
 @router.message(AdminStates.ch_waiting_name, F.text)
 async def on_channel_name_entered(message: Message, state: FSMContext, lang: str = "uz"):
-    """📛 Channel name entered, ask for Telegram ID if TG channel"""
+    """📛 Channel name entered, validate and save automatically"""
     await state.update_data(new_ch_name=message.text.strip())
     state_data = await state.get_data()
 
     if state_data.get("new_ch_type") == "telegram":
-        # 🆔 Telegram channels need a channel_id for API verification
-        await message.answer(
-            "🆔 Telegram kanal ID sini yuboring:\n"
-            "<i>(Masalan: @channel_username yoki -1001234567890)</i>\n\n"
-            "⚠️ <b>Muhim:</b> Botni ushbu kanalga admin qilib qo'shing!",
-            parse_mode="HTML"
-        )
-        await state.set_state(AdminStates.ch_waiting_id)
+        # 🆔 Auto-determine channel ID from URL and validate
+        url = state_data.get("new_ch_url", "")
+        ch_id = url
+        
+        # Parse common t.me links to get @username
+        if "t.me/" in url:
+            parts = url.split("t.me/")
+            if len(parts) > 1:
+                username = parts[1].split("/")[0].split("?")[0]
+                if not username.startswith("+"): # Ignore private invite links
+                    ch_id = f"@{username}"
+
+        try:
+            # First show a loading message
+            loading_msg = await message.answer("⏳ <i>Tekshirilmoqda... Kanal ID aniqlanmoqda.</i>", parse_mode="HTML")
+            
+            # Validate with Telegram API
+            chat = await message.bot.get_chat(ch_id)
+            
+            # We got the chat successfully, save the exact numeric ID to be safe
+            await state.update_data(new_ch_id=str(chat.id))
+            await loading_msg.delete()
+            await _save_new_channel(message, state, lang)
+            
+        except Exception as e:
+            await message.answer(
+                f"❌ <b>Xato: Bunday kanal topilmadi yoki bot u yerda admin emas!</b>\n\n"
+                f"Siz kiritgan link orqali kanalni tekshirib bo'lmadi: <code>{ch_id}</code>\n"
+                f"Iltimos, botni telegram kanalga admin qilganingizga va to'g'ri ochiq (public) link kiritganingizga ishonch hosil qiling.\n\n"
+                f"Xatolik tasfilotlari: {e}",
+                parse_mode="HTML"
+            )
+            # Re-ask for URL
+            emoji = "📢"
+            await message.answer(
+                f"{emoji} <b>Telegram</b> kanal\n\n"
+                f"🔗 Kanal URL manzilini yoki username ni yuboring:\n"
+                f"<i>(Masalan: https://t.me/channel_name yoki @channel_name)</i>",
+                parse_mode="HTML"
+            )
+            await state.set_state(AdminStates.ch_waiting_url)
     else:
-        # 📸/▶️ Instagram/YouTube don't need channel_id
+        # 📸/▶️ Instagram/YouTube don't need channel_id validation
         await _save_new_channel(message, state, lang)
-
-
-@router.message(AdminStates.ch_waiting_id, F.text)
-async def on_channel_id_entered(message: Message, state: FSMContext, lang: str = "uz"):
-    """🆔 Telegram channel ID entered, validate and save channel"""
-    ch_id = message.text.strip()
-    
-    # 🔍 Validate channel with Telegram API First
-    try:
-        await message.bot.get_chat(ch_id)
-    except Exception as e:
-        await message.answer(
-            f"❌ <b>Xato kanal ID yoki bot admin emas!</b>\n\n"
-            f"Qaytadan tekshirib yuboring (Masalan: <code>@username</code> yoki <code>-100...</code>)\n"
-            f"Xatolik: {e}",
-            parse_mode="HTML"
-        )
-        return
-
-    await state.update_data(new_ch_id=ch_id)
-    await _save_new_channel(message, state, lang)
 
 
 async def _save_new_channel(message: Message, state: FSMContext, lang: str = "uz"):
