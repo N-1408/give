@@ -14,6 +14,7 @@
 
 import time
 import logging
+import re
 from typing import Optional
 from bot import database as db
 
@@ -22,6 +23,20 @@ logger = logging.getLogger(__name__)
 # ⏰ Text cache: {(text_key, language): (content, image_file_id, timestamp)}
 _text_cache: dict = {}
 _CACHE_TTL = 300  # 🕐 Cache for 5 minutes
+
+def markdown_to_html(text: str) -> str:
+    """🛠️ Convert basic admin Markdown to safe HTML tags"""
+    if not text:
+        return ""
+    # Convert **bold** to <b>bold</b>
+    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    # Convert *bold* to <b>bold</b>
+    text = re.sub(r'\*(.*?)\*', r'<b>\1</b>', text)
+    # Convert _italic_ to <i>italic</i> (only bounded by space/newline to prevent URL breaking)
+    text = re.sub(r'(^|\s)_(.*?)_(\s|$)', r'\1<i>\2</i>\3', text)
+    # Convert `code` to <code>code</code>
+    text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)
+    return text
 
 
 def _get_cached(text_key: str, language: str) -> Optional[tuple]:
@@ -161,7 +176,7 @@ async def get_message(text_key: str, language: str = "uz", **kwargs) -> str:
     # ⚡ Check cache first (fastest)
     cached = _get_cached(text_key, language)
     if cached:
-        text = cached[0]  # content
+        text = markdown_to_html(cached[0])  # content
         if kwargs:
             try:
                 text = text.format(**kwargs)
@@ -173,8 +188,8 @@ async def get_message(text_key: str, language: str = "uz", **kwargs) -> str:
     try:
         db_text = await db.get_text(text_key, language)
         if db_text and db_text.get("content"):
-            text = db_text["content"]
-            _set_cache(text_key, language, text, db_text.get("image_file_id"))
+            text = markdown_to_html(db_text["content"])
+            _set_cache(text_key, language, db_text["content"], db_text.get("image_file_id"))
             if kwargs:
                 try:
                     text = text.format(**kwargs)
@@ -187,6 +202,7 @@ async def get_message(text_key: str, language: str = "uz", **kwargs) -> str:
     # 📋 Fallback to hardcoded defaults
     lang_messages = FALLBACK_MESSAGES.get(language, FALLBACK_MESSAGES["uz"])
     text = lang_messages.get(text_key, f"[{text_key}]")
+    text = markdown_to_html(text)
 
     if kwargs:
         try:
@@ -207,7 +223,7 @@ async def get_text_with_image(text_key: str, language: str = "uz") -> tuple:
     # ⚡ Check cache first
     cached = _get_cached(text_key, language)
     if cached:
-        return cached[0], cached[1]
+        return markdown_to_html(cached[0]), cached[1]
 
     # 🗄️ Try database
     try:
@@ -216,9 +232,10 @@ async def get_text_with_image(text_key: str, language: str = "uz") -> tuple:
             content = db_text.get("content", "")
             image_id = db_text.get("image_file_id")
             _set_cache(text_key, language, content, image_id)
-            return content, image_id
+            return markdown_to_html(content), image_id
     except Exception as e:
         logger.warning(f"⚠️ DB text fetch failed: {e}")
 
     lang_messages = FALLBACK_MESSAGES.get(language, FALLBACK_MESSAGES["uz"])
-    return lang_messages.get(text_key, f"[{text_key}]"), None
+    content = lang_messages.get(text_key, f"[{text_key}]")
+    return markdown_to_html(content), None

@@ -80,7 +80,7 @@ async def cmd_shep(message: Message, state: FSMContext, lang: str = "uz"):
     if is_admin:
         # 👑 Already admin, show admin reply keyboard + inline panel
         await message.answer(
-            "👑 *Xush kelibsiz, Shep!*",
+            "👑 <b>Xush kelibsiz, Shep!</b>",
             parse_mode="HTML",
             reply_markup=get_admin_menu_keyboard(lang)
         )
@@ -169,7 +169,7 @@ async def on_edit_text_key_selected(callback: CallbackQuery):
     text_key = callback.data.replace("edit_text_", "")
     await callback.answer()
     await callback.message.edit_text(
-        f"🌐 *{text_key}* — qaysi til uchun o'zgartirasiz?",
+        f"🌐 <b>{text_key}</b> — qaysi til uchun o'zgartirasiz?",
         parse_mode="HTML",
         reply_markup=get_language_select_keyboard(text_key)
     )
@@ -489,26 +489,23 @@ def _build_channels_text_and_keyboard(channels):
     """📢 Build channel list text and inline keyboard"""
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-    text = "📢 *Kanal sozlamalari:*\n\n"
+    text = "📢 <b>Kanal sozlamalari:</b>\n\n"
     buttons = []
 
     for ch in channels:
         emoji = {"telegram": "📢", "instagram": "📸", "youtube": "▶️"}.get(ch["channel_type"], "🔗")
-        status = "✅" if ch.get("is_active") else "❌"
         ch_id = ch["id"]
 
-        text += f"{emoji} {status} *{ch.get('channel_name', '—')}* ({ch['channel_type']})\n"
+        text += f"{emoji} <b>{ch.get('channel_name', '—')}</b> ({ch['channel_type']})\n"
         text += f"   🔗 {ch.get('channel_url', '—')}\n"
         if ch.get("channel_id"):
             text += f"   🆔 {ch['channel_id']}\n"
         text += "\n"
 
-        # 🔄 Toggle and 🗑️ Delete buttons for each channel
-        toggle_label = "🔴 O'chirish" if ch.get("is_active") else "🟢 Yoqish"
+        # 🗑️ Delete button for each channel
         buttons.append([
-            InlineKeyboardButton(text=f"{emoji} {ch.get('channel_name', '—')[:15]}", callback_data=f"ch_noop_{ch_id}"),
-            InlineKeyboardButton(text=toggle_label, callback_data=f"ch_toggle_{ch_id}"),
-            InlineKeyboardButton(text="🗑️", callback_data=f"ch_delete_{ch_id}"),
+            InlineKeyboardButton(text=f"{emoji} {ch.get('channel_name', '—')[:20]}", callback_data=f"ch_noop_{ch_id}"),
+            InlineKeyboardButton(text="🗑️ O'chirish", callback_data=f"ch_delete_{ch_id}"),
         ])
 
     # ➕ Add channel button
@@ -533,22 +530,7 @@ async def on_admin_channels(callback: CallbackQuery, lang: str = "uz"):
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
-@router.callback_query(F.data.startswith("ch_toggle_"))
-async def on_channel_toggle(callback: CallbackQuery, lang: str = "uz"):
-    """🔄 Toggle channel active/inactive"""
-    if not await db.is_user_admin(callback.from_user.id):
-        await callback.answer("⛔", show_alert=True)
-        return
 
-    ch_db_id = int(callback.data.replace("ch_toggle_", ""))
-    new_state = await db.toggle_channel(ch_db_id)
-    status_text = "✅ Yoqildi" if new_state else "❌ O'chirildi"
-    await callback.answer(status_text, show_alert=True)
-
-    # 🔄 Refresh channel list
-    channels = await db.get_all_channels()
-    text, keyboard = _build_channels_text_and_keyboard(channels)
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("ch_delete_"))
@@ -599,7 +581,7 @@ async def on_add_channel_start(callback: CallbackQuery, state: FSMContext, lang:
         [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="admin_channels")],
     ])
     await callback.message.edit_text(
-        "➕ *Yangi kanal qo'shish*\n\nKanal turini tanlang:",
+        "➕ <b>Yangi kanal qo'shish</b>\n\nKanal turini tanlang:",
         parse_mode="HTML", reply_markup=type_keyboard
     )
 

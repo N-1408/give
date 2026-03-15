@@ -199,18 +199,20 @@ def get_admin_keyboard(language: str = "uz") -> InlineKeyboardMarkup:
 def get_text_keys_keyboard() -> InlineKeyboardMarkup:
     """📝 Text keys selection for admin editing"""
     keys = [
-        ("welcome", "🏠 Welcome"),
-        ("ask_contact", "📱 Ask Contact"),
-        ("channels_intro", "📢 Channels Intro"),
-        ("verification_success", "✅ Verification Success"),
-        ("code_message", "🎟️ Code Message"),
-        ("referral_info", "🔗 Referral Info"),
-        ("referral_notification", "🔔 Referral Notification"),
-        ("my_chances", "🎟️ My Chances"),
-        ("rules", "📋 Rules"),
-        ("prizes", "🎁 Prizes"),
-        ("already_registered", "⚠️ Already Registered"),
-        ("not_verified", "❌ Not Verified"),
+        ("welcome", "🏠 Xush kelibsiz"),
+        ("ask_contact", "📱 Kontakt so'rash"),
+        ("channels_intro", "📢 Kanallar bilan tanishuv"),
+        ("verification_success", "✅ Muvaffaqiyatli tasdiqlash"),
+        ("code_message", "🎟️ Kod xabari"),
+        ("referral_info", "🔗 Referal ma'lumoti"),
+        ("referral_notification", "🔔 Referal xabarnomasi"),
+        ("my_chances", "🎟️ Mening imkoniyatlarim"),
+        ("rules", "📋 Qoidalar"),
+        ("prizes", "🎁 Sovrinlar"),
+        ("already_registered", "⚠️ Ro'yxatdan o'tgan"),
+        ("not_verified", "❌ Tasdiqlanmagan"),
+        ("top_referrers", "🏆 Top Referallar"),
+        ("stats_message", "📊 Bot statistikasi"),
     ]
     buttons = [
         [InlineKeyboardButton(text=label, callback_data=f"edit_text_{key}")]
