@@ -1,0 +1,518 @@
+# ============================================
+# 👑 Admin Handler - Telegram Giveaway Bot
+# 📁 File: bot/handlers/admin.py
+# 👤 Created by: User with AI
+# 📝 Handles the secret /shep admin command with password
+#    authentication. Provides admin panel with stats, text
+#    editing, Excel export, broadcast, and channel settings.
+#    This command is HIDDEN and undocumented by design.
+# 📅 Created: 2026-03-15 07:47 (Tashkent Time)
+# ============================================
+
+import os
+import io
+import asyncio
+import logging
+from datetime import datetime, timezone, timedelta
+
+from aiogram import Router, F, Bot
+from aiogram.types import (
+    Message, CallbackQuery, BufferedInputFile
+)
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+
+from bot import database as db
+from bot.config import config
+from bot.texts.messages import get_message
+from bot.keyboards.keyboards import (
+    get_admin_keyboard,
+    get_text_keys_keyboard,
+    get_language_select_keyboard,
+    get_confirm_broadcast_keyboard,
+    get_main_menu_keyboard,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# 🔄 FSM States for admin actions
+class AdminStates(StatesGroup):
+    waiting_password = State()      # 🔐 Waiting for admin password
+    editing_text = State()          # 📝 Waiting for new text content
+    broadcast_compose = State()     # 📢 Composing broadcast message
+    broadcast_confirm = State()     # ✅ Confirming broadcast
+
+
+# 🛤️ Router
+router = Router()
+
+
+# =============================================
+# 🔐 SECRET /SHEP COMMAND (HIDDEN)
+# =============================================
+
+@router.message(Command("shep"))
+async def cmd_shep(message: Message, state: FSMContext, lang: str = "uz"):
+    """🔐 Secret admin entry point — HIDDEN, UNDOCUMENTED"""
+    # 🔍 Check if user is already admin
+    is_admin = await db.is_user_admin(message.from_user.id)
+
+    if is_admin:
+        # 👑 Already admin, show panel
+        text = await get_message("admin_welcome", lang)
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+        return
+
+    # 🔐 Ask for password
+    text = await get_message("enter_password", lang)
+    await message.answer(text, parse_mode="Markdown")
+    await state.set_state(AdminStates.waiting_password)
+
+
+@router.message(AdminStates.waiting_password)
+async def on_password_entered(message: Message, state: FSMContext, lang: str = "uz"):
+    """🔐 Verify admin password"""
+    if message.text == config.ADMIN_PASSWORD:
+        # ✅ Correct password → make admin
+        await db.set_admin(message.from_user.id, True)
+        logger.info(f"👑 New admin: {message.from_user.id} ({message.from_user.first_name})")
+
+        text = await get_message("admin_welcome", lang)
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+        await state.clear()
+    else:
+        # ❌ Wrong password
+        text = await get_message("wrong_password", lang)
+        await message.answer(text, parse_mode="Markdown")
+        await state.clear()
+
+
+# =============================================
+# 📊 STATISTICS
+# =============================================
+
+@router.callback_query(F.data == "admin_stats")
+async def on_admin_stats(callback: CallbackQuery, lang: str = "uz"):
+    """📊 Show bot statistics"""
+    # 👑 Verify admin
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    stats = await db.get_statistics()
+    text = await get_message("stats_message", lang, **stats)
+    await callback.message.edit_text(
+        text, parse_mode="Markdown",
+        reply_markup=get_admin_keyboard(lang)
+    )
+
+
+# =============================================
+# 📝 EDIT TEXTS
+# =============================================
+
+@router.callback_query(F.data == "admin_edit_texts")
+async def on_admin_edit_texts(callback: CallbackQuery, lang: str = "uz"):
+    """📝 Show text keys for editing"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    text = await get_message("select_text_key", lang)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_text_keys_keyboard())
+
+
+@router.callback_query(F.data.startswith("edit_text_"))
+async def on_edit_text_key_selected(callback: CallbackQuery):
+    """📝 Text key selected, now choose language"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    text_key = callback.data.replace("edit_text_", "")
+    await callback.answer()
+    await callback.message.edit_text(
+        f"🌐 *{text_key}* — qaysi til uchun o'zgartirasiz?",
+        parse_mode="Markdown",
+        reply_markup=get_language_select_keyboard(text_key)
+    )
+
+
+@router.callback_query(F.data.startswith("textlang_"))
+async def on_text_language_selected(callback: CallbackQuery, state: FSMContext, lang: str = "uz"):
+    """🌐 Language selected for text editing, show current text and ask for new"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    # 🔍 Parse: textlang_{text_key}_{lang_code}
+    parts = callback.data.split("_", 2)  # textlang, key, lang
+    if len(parts) < 3:
+        await callback.answer("❌ Error", show_alert=True)
+        return
+
+    text_key = parts[1]
+    target_lang = parts[2]
+
+    # 💾 Save to FSM
+    await state.update_data(edit_text_key=text_key, edit_text_lang=target_lang)
+    await callback.answer()
+
+    # 📝 Show current text
+    current = await db.get_text(text_key, target_lang)
+    current_text = current.get("content", "—") if current else "—"
+
+    send_new = await get_message("send_new_text", lang)
+    await callback.message.edit_text(
+        f"📝 *{text_key}* [{target_lang.upper()}]\n\n"
+        f"📄 Hozirgi text:\n{current_text}\n\n"
+        f"{'─' * 30}\n\n{send_new}",
+        parse_mode="Markdown"
+    )
+    await state.set_state(AdminStates.editing_text)
+
+
+@router.message(AdminStates.editing_text, F.photo)
+async def on_new_text_with_photo(message: Message, state: FSMContext, lang: str = "uz"):
+    """📝 Admin sent new text with photo"""
+    state_data = await state.get_data()
+    text_key = state_data.get("edit_text_key")
+    target_lang = state_data.get("edit_text_lang")
+
+    if not text_key or not target_lang:
+        await state.clear()
+        return
+
+    # 🖼️ Get photo file_id (largest size)
+    photo_id = message.photo[-1].file_id
+    caption = message.caption or ""
+
+    await db.update_text(text_key, target_lang, caption, photo_id)
+    text = await get_message("text_updated", lang)
+    await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await state.clear()
+
+
+@router.message(AdminStates.editing_text, F.text)
+async def on_new_text(message: Message, state: FSMContext, lang: str = "uz"):
+    """📝 Admin sent new text (no photo)"""
+    state_data = await state.get_data()
+    text_key = state_data.get("edit_text_key")
+    target_lang = state_data.get("edit_text_lang")
+
+    if not text_key or not target_lang:
+        await state.clear()
+        return
+
+    await db.update_text(text_key, target_lang, message.text)
+    text = await get_message("text_updated", lang)
+    await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await state.clear()
+
+
+# =============================================
+# 📥 EXCEL EXPORT
+# =============================================
+
+@router.callback_query(F.data == "admin_export")
+async def on_admin_export(callback: CallbackQuery, bot: Bot, lang: str = "uz"):
+    """📥 Export all users + codes to formatted Excel"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    gen_text = await get_message("export_generating", lang)
+    await callback.message.edit_text(gen_text, parse_mode="Markdown")
+
+    try:
+        # 📊 Fetch all users
+        users = await db.get_all_users_for_export()
+
+        # 📝 Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Giveaway Users"
+
+        # 🎨 Styles
+        header_font = Font(name="Arial", bold=True, color="FFFFFF", size=12)
+        header_fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin")
+        )
+        # 🎨 Alternating row colors
+        light_fill = PatternFill(start_color="D6E4F0", end_color="D6E4F0", fill_type="solid")
+
+        # 📋 Headers
+        headers = [
+            "№", "Telegram ID", "Username", "Ism",
+            "Familiya", "Telefon", "Til", "Tasdiqlangan",
+            "Kodlar", "Referal soni", "Jami kodlar", "Ro'yxatdan o'tgan sana"
+        ]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # 📝 Data rows
+        for idx, user in enumerate(users, 1):
+            row_num = idx + 1
+            row_data = [
+                idx,
+                user.get("telegram_id", ""),
+                user.get("username", "") or "—",
+                user.get("first_name", "") or "—",
+                user.get("last_name", "") or "—",
+                user.get("phone", "") or "—",
+                user.get("language", "uz").upper(),
+                "✅" if user.get("is_verified") else "❌",
+                user.get("codes_list", "") or "—",
+                user.get("referral_count", 0),
+                user.get("total_codes", 0),
+                user.get("created_at", "").strftime("%d.%m.%Y %H:%M") if user.get("created_at") else "—"
+            ]
+
+            for col, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_num, column=col, value=value)
+                cell.border = thin_border
+                if col in (1, 7, 8, 10, 11):
+                    cell.alignment = center_alignment
+                else:
+                    cell.alignment = cell_alignment
+                # 🎨 Alternating row colors
+                if idx % 2 == 0:
+                    cell.fill = light_fill
+
+        # 📏 Auto-width columns with extra spacing
+        for col in range(1, len(headers) + 1):
+            max_length = len(str(headers[col - 1]))
+            for row in range(2, len(users) + 2):
+                cell_value = str(ws.cell(row=row, column=col).value or "")
+                if len(cell_value) > max_length:
+                    max_length = len(cell_value)
+            # ➕ Add padding
+            ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = min(max_length + 4, 50)
+
+        # 🔒 Freeze header row
+        ws.freeze_panes = "A2"
+
+        # 💾 Save to buffer
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        # 📅 Current date for filename
+        tashkent_tz = timezone(timedelta(hours=5))
+        now = datetime.now(tashkent_tz)
+        filename = f"giveaway_users_{now.strftime('%Y%m%d_%H%M')}.xlsx"
+
+        # 📤 Send file
+        doc = BufferedInputFile(output.read(), filename=filename)
+        done_text = await get_message("export_done", lang)
+        await bot.send_document(
+            callback.from_user.id,
+            doc,
+            caption=done_text
+        )
+
+        logger.info(f"📥 Excel export sent to admin {callback.from_user.id} ({len(users)} users)")
+
+    except Exception as e:
+        logger.error(f"❌ Excel export error: {e}")
+        await callback.message.answer(f"❌ Export error: {e}")
+
+
+# =============================================
+# 📢 BROADCAST
+# =============================================
+
+@router.callback_query(F.data == "admin_broadcast")
+async def on_admin_broadcast(callback: CallbackQuery, state: FSMContext, lang: str = "uz"):
+    """📢 Start broadcast composition"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    text = await get_message("send_broadcast_text", lang)
+    await callback.message.edit_text(text, parse_mode="Markdown")
+    await state.set_state(AdminStates.broadcast_compose)
+
+
+@router.message(AdminStates.broadcast_compose, F.photo)
+async def on_broadcast_photo(message: Message, state: FSMContext, lang: str = "uz"):
+    """📢 Admin composed broadcast with photo"""
+    photo_id = message.photo[-1].file_id
+    caption = message.caption or ""
+
+    await state.update_data(
+        broadcast_photo_id=photo_id,
+        broadcast_text=caption,
+        broadcast_type="photo"
+    )
+
+    confirm_text = await get_message("broadcast_confirm", lang)
+    await message.answer_photo(
+        photo=photo_id,
+        caption=f"{confirm_text}\n\n{caption}",
+        parse_mode="Markdown",
+        reply_markup=get_confirm_broadcast_keyboard(lang)
+    )
+    await state.set_state(AdminStates.broadcast_confirm)
+
+
+@router.message(AdminStates.broadcast_compose, F.text)
+async def on_broadcast_text(message: Message, state: FSMContext, lang: str = "uz"):
+    """📢 Admin composed text-only broadcast"""
+    await state.update_data(
+        broadcast_text=message.text,
+        broadcast_type="text"
+    )
+
+    confirm_text = await get_message("broadcast_confirm", lang)
+    await message.answer(
+        f"{confirm_text}\n\n{message.text}",
+        parse_mode="Markdown",
+        reply_markup=get_confirm_broadcast_keyboard(lang)
+    )
+    await state.set_state(AdminStates.broadcast_confirm)
+
+
+@router.callback_query(F.data == "broadcast_confirm")
+async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMContext, lang: str = "uz"):
+    """✅ Execute broadcast to all users"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    state_data = await state.get_data()
+    broadcast_text = state_data.get("broadcast_text", "")
+    broadcast_type = state_data.get("broadcast_type", "text")
+    photo_id = state_data.get("broadcast_photo_id")
+
+    # 📋 Get all user IDs
+    user_ids = await db.get_all_user_ids()
+    total = len(user_ids)
+
+    started_text = await get_message("broadcast_started", lang, total=total)
+    progress_msg = await callback.message.edit_text(started_text, parse_mode="Markdown")
+
+    sent = 0
+    failed = 0
+    blocked = 0
+
+    for i, uid in enumerate(user_ids):
+        try:
+            if broadcast_type == "photo" and photo_id:
+                await bot.send_photo(uid, photo=photo_id, caption=broadcast_text, parse_mode="Markdown")
+            else:
+                await bot.send_message(uid, broadcast_text, parse_mode="Markdown")
+            sent += 1
+        except Exception as e:
+            error_text = str(e).lower()
+            if "blocked" in error_text or "deactivated" in error_text:
+                blocked += 1
+            else:
+                failed += 1
+            logger.debug(f"📢 Broadcast failed for {uid}: {e}")
+
+        # ⏱️ Rate limiting: 25 messages/second
+        if (i + 1) % config.BROADCAST_RATE == 0:
+            await asyncio.sleep(1)
+
+        # 📊 Update progress every 100 messages
+        if (i + 1) % 100 == 0:
+            try:
+                await progress_msg.edit_text(
+                    f"📢 Yuborilmoqda... {i+1}/{total}\n"
+                    f"📤 Yuborildi: {sent} | ❌ Xato: {failed} | 🚫 Bloklangan: {blocked}"
+                )
+            except Exception:
+                pass
+
+    # ✅ Broadcast complete
+    done_text = await get_message("broadcast_done", lang, sent=sent, failed=failed, blocked=blocked)
+    await progress_msg.edit_text(done_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await state.clear()
+
+    logger.info(f"📢 Broadcast done: sent={sent}, failed={failed}, blocked={blocked}")
+
+
+@router.callback_query(F.data == "broadcast_cancel")
+async def on_broadcast_cancelled(callback: CallbackQuery, state: FSMContext, lang: str = "uz"):
+    """❌ Cancel broadcast"""
+    await callback.answer()
+    await state.clear()
+    text = await get_message("admin_welcome", lang)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+
+
+# =============================================
+# 🔄 CHANNEL SETTINGS (PLACEHOLDER)
+# =============================================
+
+@router.callback_query(F.data == "admin_channels")
+async def on_admin_channels(callback: CallbackQuery, lang: str = "uz"):
+    """🔄 Show channel configuration"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    channels = await db.get_active_channels()
+
+    text = "🔄 *Kanal sozlamalari:*\n\n"
+    for ch in channels:
+        emoji = {"telegram": "📢", "instagram": "📸", "youtube": "▶️"}.get(ch["channel_type"], "🔗")
+        status = "✅" if ch.get("is_active") else "❌"
+        text += f"{emoji} {ch.get('channel_name', '—')} {status}\n"
+        text += f"   🔗 {ch.get('channel_url', '—')}\n"
+        if ch.get("channel_id"):
+            text += f"   🆔 {ch['channel_id']}\n"
+        text += "\n"
+
+    text += "\n_Kanal sozlamalarini o'zgartirish uchun Supabase dashboarddan foydalaning._"
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+
+
+# =============================================
+# 🔙 ADMIN PANEL NAVIGATION
+# =============================================
+
+@router.callback_query(F.data == "admin_back")
+async def on_admin_back(callback: CallbackQuery, lang: str = "uz"):
+    """🔙 Back to admin panel"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    text = await get_message("admin_welcome", lang)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+
+
+@router.callback_query(F.data == "admin_close")
+async def on_admin_close(callback: CallbackQuery, lang: str = "uz"):
+    """🔙 Close admin panel, back to main menu"""
+    await callback.answer()
+    await callback.message.delete()
+    await callback.message.answer(
+        "📋 Main menu:",
+        reply_markup=get_main_menu_keyboard(lang)
+    )

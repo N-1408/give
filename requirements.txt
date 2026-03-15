@@ -1,0 +1,12 @@
+# ============================================
+# 🤖 Telegram Giveaway Bot - Dependencies
+# 📁 File: requirements.txt
+# 👤 Created by: User with AI
+# 📅 Created: 2026-03-15 07:47 (Tashkent Time)
+# ============================================
+
+aiogram==3.4.1
+asyncpg==0.29.0
+python-dotenv==1.0.1
+openpyxl==3.1.2
+aiohttp==3.9.3

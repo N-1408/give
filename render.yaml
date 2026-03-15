@@ -1,0 +1,32 @@
+# ============================================
+# 🚀 Render Deployment Configuration
+# 📁 File: render.yaml
+# 👤 Created by: User with AI
+# 📅 Created: 2026-03-15 07:47 (Tashkent Time)
+# ============================================
+
+services:
+  - type: web
+    name: giveaway-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bot.main
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: WEBHOOK_URL
+        sync: false
+      - key: WEBHOOK_PATH
+        value: /webhook
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: BOT_MODE
+        value: webhook
+      - key: PYTHON_VERSION
+        value: "3.11.6"
