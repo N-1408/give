@@ -7,11 +7,15 @@
 #    mode (local dev) or webhook mode (Render production).
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# ============================================
 # 📋 CHANGE LOG:
 # [2026-03-15 08:06 Tashkent] - Added health check endpoint (/health)
 #   and keep-alive self-ping mechanism to prevent Render free tier sleep
+# [2026-03-15 10:15 Tashkent] - Fixed dropped messages on Render wake-up
+#   by disabling `drop_pending_updates`. App now binds to dynamic `$PORT`.
 # ============================================
 
+import os
 import asyncio
 import logging
 import sys
@@ -81,7 +85,7 @@ async def on_startup(bot: Bot):
         await bot.set_webhook(
             url=webhook_url,
             allowed_updates=["message", "callback_query"],
-            drop_pending_updates=True
+            drop_pending_updates=False  # ⚠️ Don't drop updates queued while bot was sleeping!
         )
         logger.info(f"🌐 Webhook set: {webhook_url}")
 
@@ -146,8 +150,9 @@ def run_webhook():
     setup_application(app, dp, bot=bot)
 
     # 🚀 Start web server
-    logger.info(f"🌐 Starting bot in WEBHOOK mode on port 10000...")
-    web.run_app(app, host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    logger.info(f"🌐 Starting bot in WEBHOOK mode on port {port}...")
+    web.run_app(app, host="0.0.0.0", port=port)
 
 
 def main():
