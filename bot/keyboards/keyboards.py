@@ -78,16 +78,9 @@ def get_channels_keyboard(channels: List[dict], language: str = "uz") -> InlineK
         }
         emoji = emoji_map.get(ch_type, "🔗")
 
-        # 🌐 Subscribe text per language
-        sub_text = {
-            "uz": "Obuna bo'lish",
-            "ru": "Подписаться",
-            "en": "Subscribe"
-        }
-
         buttons.append([
             InlineKeyboardButton(
-                text=f"{emoji} {ch_name} — {sub_text.get(language, sub_text['uz'])} ➜",
+                text=f"{emoji} {ch_name}",
                 url=ch_url
             )
         ])

@@ -11,6 +11,8 @@
 # [2026-03-15 09:18 Tashkent] - Fixed verification: proper error message
 #   when not subscribed (callback.answer with alert), use answer instead
 #   of edit_text to avoid errors. Performance: batched DB updates.
+# [2026-03-15 10:05 Tashkent] - Fake-check logic for Insta/YouTube: forces
+#   user to click verify twice to simulate tracking URL clicks.
 # ============================================
 
 import logging
@@ -89,12 +91,16 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
                     missing_channels.append(f"📢 {ch_name}")
 
         elif ch_type == "instagram":
-            # 📸 Instagram: click tracking
-            await db.update_user_field(user_id, "instagram_clicked", True)
+            # 📸 Instagram: Fake check logic. Warn first time, pass second time.
+            if not user.get("instagram_clicked"):
+                missing_channels.append(f"📸 {ch_name}")
+                await db.update_user_field(user_id, "instagram_clicked", True)
 
         elif ch_type == "youtube":
-            # ▶️ YouTube: click tracking
-            await db.update_user_field(user_id, "youtube_clicked", True)
+            # ▶️ YouTube: Fake check logic. Warn first time, pass second time.
+            if not user.get("youtube_clicked"):
+                missing_channels.append(f"▶️ {ch_name}")
+                await db.update_user_field(user_id, "youtube_clicked", True)
 
     # ❌ If missing channels — show alert + keep current message
     if missing_channels:
