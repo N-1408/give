@@ -5,14 +5,14 @@
 # 📝 Bot entry point that initializes database, registers all
 #    handlers and middleware, and starts the bot in either polling
 #    mode (local dev) or webhook mode (Render production).
-# 📅 Created: 2026-03-15 07:47 (Tashkent Time)
-# ============================================
 # ============================================
 # 📋 CHANGE LOG:
 # [2026-03-15 08:06 Tashkent] - Added health check endpoint (/health)
 #   and keep-alive self-ping mechanism to prevent Render free tier sleep
 # [2026-03-15 10:15 Tashkent] - Fixed dropped messages on Render wake-up
 #   by disabling `drop_pending_updates`. App now binds to dynamic `$PORT`.
+# [2026-03-15 10:35 Tashkent] - Changed Default ParseMode to HTML 
+#   to fix Parse Entities errors throwing TelegramBadRequest
 # ============================================
 
 import os
@@ -125,7 +125,7 @@ def create_dispatcher() -> Dispatcher:
 
 async def run_polling():
     """🔄 Run bot in polling mode (local development)"""
-    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.MARKDOWN)
+    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
     dp = create_dispatcher()
 
     logger.info("🔄 Starting bot in POLLING mode...")
@@ -134,7 +134,7 @@ async def run_polling():
 
 def run_webhook():
     """🌐 Run bot in webhook mode (Render production)"""
-    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.MARKDOWN)
+    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
     dp = create_dispatcher()
 
     # 🌐 Create aiohttp web app

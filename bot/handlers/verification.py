@@ -65,7 +65,7 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
     if user.get("is_verified"):
         await callback.answer("✅ Siz allaqachon ro'yxatdan o'tgansiz!", show_alert=True)
         text = await get_message("already_registered", lang)
-        await callback.message.answer(text, parse_mode="Markdown", reply_markup=get_main_menu_keyboard(lang))
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard(lang))
         return
 
     # 📢 Get active channels
@@ -117,7 +117,7 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
         text = await get_message("not_verified", lang, missing_channels=missing_text)
         await callback.message.answer(
             text,
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=get_channels_keyboard(channels, lang)
         )
         return
@@ -143,7 +143,7 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
 
     await callback.message.answer(
         f"{success_text}\n\n{code_text}",
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=get_main_menu_keyboard(lang)
     )
 
@@ -196,7 +196,7 @@ async def _process_referral_reward(bot: Bot, referrer_id: int, new_user_id: int,
             "referral_notification", referrer_lang,
             name=name, code=bonus_code, total=total_codes
         )
-        await bot.send_message(referrer_id, notification, parse_mode="Markdown")
+        await bot.send_message(referrer_id, notification, parse_mode="HTML")
 
         logger.info(f"🎟️ Referral bonus: {bonus_code} → {referrer_id} (from {new_user_id})")
 

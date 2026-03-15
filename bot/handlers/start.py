@@ -63,13 +63,13 @@ async def cmd_start_with_referral(message: Message, command: CommandObject, stat
     if existing_user and existing_user.get("is_verified"):
         lang = existing_user.get("language", "uz")
         text = await get_message("already_registered", lang)
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard(lang))
         await state.clear()
         return
 
     # 🌐 Show language selection
     text = await get_message("choose_language", "uz")
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_language_keyboard())
+    await message.answer(text, parse_mode="HTML", reply_markup=get_language_keyboard())
     await state.set_state(RegistrationStates.waiting_language)
 
 
@@ -81,13 +81,13 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     if existing_user and existing_user.get("is_verified"):
         lang = existing_user.get("language", "uz")
         text = await get_message("already_registered", lang)
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard(lang))
         await state.clear()
         return
 
     # 🌐 Show language selection
     text = await get_message("choose_language", "uz")
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_language_keyboard())
+    await message.answer(text, parse_mode="HTML", reply_markup=get_language_keyboard())
     await state.set_state(RegistrationStates.waiting_language)
 
 
@@ -110,7 +110,7 @@ async def on_language_selected(callback: CallbackQuery, state: FSMContext):
     text = await get_message("ask_contact", lang)
     await callback.message.answer(
         text,
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=get_contact_keyboard(lang)
     )
     await state.set_state(RegistrationStates.waiting_contact)
@@ -152,7 +152,7 @@ async def on_contact_received(message: Message, state: FSMContext, bot: Bot):
     text = await get_message("channels_intro", lang)
     await message.answer(
         text,
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=get_channels_keyboard(channels, lang)
     )
     await state.set_state(RegistrationStates.waiting_verification)

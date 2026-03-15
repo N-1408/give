@@ -63,7 +63,7 @@ async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
         "my_chances", lang,
         total=total, referral_count=referral_count, codes_list=codes_list
     )
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
 
 
 # =============================================
@@ -79,7 +79,7 @@ async def on_referral_link(message: Message, bot: Bot, lang: str = "uz"):
     referral_link = await create_start_link(bot, f"ref_{user_id}")
 
     text = await get_message("referral_info", lang, referral_link=referral_link)
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
 
 
 # =============================================
@@ -94,9 +94,9 @@ async def on_rules(message: Message, lang: str = "uz"):
     content, image_id = await get_text_with_image("rules", lang)
 
     if image_id:
-        await message.answer_photo(photo=image_id, caption=content, parse_mode="Markdown")
+        await message.answer_photo(photo=image_id, caption=content, parse_mode="HTML")
     else:
-        await message.answer(content, parse_mode="Markdown")
+        await message.answer(content, parse_mode="HTML")
 
 
 # =============================================
@@ -111,9 +111,9 @@ async def on_prizes(message: Message, lang: str = "uz"):
     content, image_id = await get_text_with_image("prizes", lang)
 
     if image_id:
-        await message.answer_photo(photo=image_id, caption=content, parse_mode="Markdown")
+        await message.answer_photo(photo=image_id, caption=content, parse_mode="HTML")
     else:
-        await message.answer(content, parse_mode="Markdown")
+        await message.answer(content, parse_mode="HTML")
 
 
 # =============================================
@@ -130,7 +130,7 @@ async def on_admin_stats_reply(message: Message, lang: str = "uz"):
         return
     stats = await db.get_statistics()
     text = await get_message("stats_message", lang, **stats)
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
 
 
 @router.message(F.text.in_({
@@ -142,7 +142,7 @@ async def on_admin_export_reply(message: Message, bot: Bot, lang: str = "uz"):
         return
 
     gen_text = await get_message("export_generating", lang)
-    await message.answer(gen_text, parse_mode="Markdown")
+    await message.answer(gen_text, parse_mode="HTML")
 
     try:
         import io
@@ -239,7 +239,7 @@ async def on_admin_broadcast_reply(message: Message, state: FSMContext, lang: st
 
     from bot.handlers.admin import AdminStates
     text = await get_message("send_broadcast_text", lang)
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
     await state.set_state(AdminStates.broadcast_compose)
 
 
@@ -254,7 +254,7 @@ async def on_admin_channels_reply(message: Message, lang: str = "uz"):
     from bot.handlers.admin import _build_channels_text_and_keyboard
     channels = await db.get_all_channels()
     text, keyboard = _build_channels_text_and_keyboard(channels)
-    await message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @router.message(F.text.in_({
@@ -266,4 +266,4 @@ async def on_admin_edit_texts_reply(message: Message, lang: str = "uz"):
         return
 
     text = await get_message("select_text_key", lang)
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_text_keys_keyboard())
+    await message.answer(text, parse_mode="HTML", reply_markup=get_text_keys_keyboard())

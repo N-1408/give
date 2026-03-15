@@ -81,14 +81,14 @@ async def cmd_shep(message: Message, state: FSMContext, lang: str = "uz"):
         # 👑 Already admin, show admin reply keyboard + inline panel
         await message.answer(
             "👑 *Xush kelibsiz, Shep!*",
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=get_admin_menu_keyboard(lang)
         )
         return
 
     # 🔐 Ask for password
     text = await get_message("enter_password", lang)
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
     await state.set_state(AdminStates.waiting_password)
 
 
@@ -103,14 +103,14 @@ async def on_password_entered(message: Message, state: FSMContext, lang: str = "
         # 👑 Show admin reply keyboard
         await message.answer(
             "👑 *Xush kelibsiz, Shep!*",
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=get_admin_menu_keyboard(lang)
         )
         await state.clear()
     else:
         # ❌ Wrong password
         text = await get_message("wrong_password", lang)
-        await message.answer(text, parse_mode="Markdown")
+        await message.answer(text, parse_mode="HTML")
         await state.clear()
 
 
@@ -130,7 +130,7 @@ async def on_admin_stats(callback: CallbackQuery, lang: str = "uz"):
     stats = await db.get_statistics()
     text = await get_message("stats_message", lang, **stats)
     await callback.message.edit_text(
-        text, parse_mode="Markdown",
+        text, parse_mode="HTML",
         reply_markup=get_admin_keyboard(lang)
     )
 
@@ -148,7 +148,7 @@ async def on_admin_edit_texts(callback: CallbackQuery, lang: str = "uz"):
 
     await callback.answer()
     text = await get_message("select_text_key", lang)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_text_keys_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_text_keys_keyboard())
 
 
 @router.callback_query(F.data.startswith("edit_text_"))
@@ -162,7 +162,7 @@ async def on_edit_text_key_selected(callback: CallbackQuery):
     await callback.answer()
     await callback.message.edit_text(
         f"🌐 *{text_key}* — qaysi til uchun o'zgartirasiz?",
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=get_language_select_keyboard(text_key)
     )
 
@@ -196,7 +196,7 @@ async def on_text_language_selected(callback: CallbackQuery, state: FSMContext, 
         f"📝 *{text_key}* [{target_lang.upper()}]\n\n"
         f"📄 Hozirgi text:\n{current_text}\n\n"
         f"{'─' * 30}\n\n{send_new}",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     await state.set_state(AdminStates.editing_text)
 
@@ -220,7 +220,7 @@ async def on_new_text_with_photo(message: Message, state: FSMContext, lang: str 
     clear_text_cache()  # 🧹 Clear text cache
 
     text = await get_message("text_updated", lang)
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await message.answer(text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
     await state.clear()
 
 
@@ -239,7 +239,7 @@ async def on_new_text(message: Message, state: FSMContext, lang: str = "uz"):
     clear_text_cache()  # 🧹 Clear text cache
 
     text = await get_message("text_updated", lang)
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await message.answer(text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
     await state.clear()
 
 
@@ -256,7 +256,7 @@ async def on_admin_export(callback: CallbackQuery, bot: Bot, lang: str = "uz"):
 
     await callback.answer()
     gen_text = await get_message("export_generating", lang)
-    await callback.message.edit_text(gen_text, parse_mode="Markdown")
+    await callback.message.edit_text(gen_text, parse_mode="HTML")
 
     try:
         # 📊 Fetch all users
@@ -376,7 +376,7 @@ async def on_admin_broadcast(callback: CallbackQuery, state: FSMContext, lang: s
 
     await callback.answer()
     text = await get_message("send_broadcast_text", lang)
-    await callback.message.edit_text(text, parse_mode="Markdown")
+    await callback.message.edit_text(text, parse_mode="HTML")
     await state.set_state(AdminStates.broadcast_compose)
 
 
@@ -394,7 +394,7 @@ async def on_broadcast_message(message: Message, state: FSMContext, lang: str = 
     await message.copy_to(chat_id=message.chat.id)
     await message.answer(
         confirm_text,
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=get_confirm_broadcast_keyboard(lang)
     )
     
@@ -423,7 +423,7 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
     total = len(user_ids)
 
     started_text = await get_message("broadcast_started", lang, total=total)
-    progress_msg = await callback.message.edit_text(started_text, parse_mode="Markdown")
+    progress_msg = await callback.message.edit_text(started_text, parse_mode="HTML")
 
     sent = 0
     failed = 0
@@ -458,7 +458,7 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
 
     # ✅ Broadcast complete
     done_text = await get_message("broadcast_done", lang, sent=sent, failed=failed, blocked=blocked)
-    await progress_msg.edit_text(done_text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await progress_msg.edit_text(done_text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
     await state.clear()
 
     logger.info(f"📢 Broadcast done: sent={sent}, failed={failed}, blocked={blocked}")
@@ -470,7 +470,7 @@ async def on_broadcast_cancelled(callback: CallbackQuery, state: FSMContext, lan
     await callback.answer()
     await state.clear()
     text = await get_message("admin_welcome", lang)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
 
 
 # =============================================
@@ -522,7 +522,7 @@ async def on_admin_channels(callback: CallbackQuery, lang: str = "uz"):
     await callback.answer()
     channels = await db.get_all_channels()
     text, keyboard = _build_channels_text_and_keyboard(channels)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("ch_toggle_"))
@@ -540,7 +540,7 @@ async def on_channel_toggle(callback: CallbackQuery, lang: str = "uz"):
     # 🔄 Refresh channel list
     channels = await db.get_all_channels()
     text, keyboard = _build_channels_text_and_keyboard(channels)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("ch_delete_"))
@@ -561,7 +561,7 @@ async def on_channel_delete(callback: CallbackQuery, lang: str = "uz"):
     # 🔄 Refresh channel list
     channels = await db.get_all_channels()
     text, keyboard = _build_channels_text_and_keyboard(channels)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("ch_noop_"))
@@ -592,7 +592,7 @@ async def on_add_channel_start(callback: CallbackQuery, state: FSMContext, lang:
     ])
     await callback.message.edit_text(
         "➕ *Yangi kanal qo'shish*\n\nKanal turini tanlang:",
-        parse_mode="Markdown", reply_markup=type_keyboard
+        parse_mode="HTML", reply_markup=type_keyboard
     )
 
 
@@ -612,7 +612,7 @@ async def on_channel_type_selected(callback: CallbackQuery, state: FSMContext, l
         f"{emoji} *{ch_type.capitalize()}* kanal\n\n"
         f"🔗 Kanal URL manzilini yuboring:\n"
         f"_(Masalan: https://t.me/channel\_name)_",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     await state.set_state(AdminStates.ch_waiting_url)
 
@@ -623,7 +623,7 @@ async def on_channel_url_entered(message: Message, state: FSMContext, lang: str 
     await state.update_data(new_ch_url=message.text.strip())
     await message.answer(
         "📛 Kanal nomini yuboring:\n_(Masalan: My Channel)_",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     await state.set_state(AdminStates.ch_waiting_name)
 
@@ -640,7 +640,7 @@ async def on_channel_name_entered(message: Message, state: FSMContext, lang: str
             "🆔 Telegram kanal ID sini yuboring:\n"
             "_(Masalan: @channel\_username yoki -1001234567890)_\n\n"
             "⚠️ *Muhim:* Botni ushbu kanalga admin qilib qo'shing!",
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         await state.set_state(AdminStates.ch_waiting_id)
     else:
@@ -676,7 +676,7 @@ async def _save_new_channel(message: Message, state: FSMContext, lang: str = "uz
     channels = await db.get_all_channels()
     text, keyboard = _build_channels_text_and_keyboard(channels)
     success_text = f"✅ *{ch_name}* kanali qo'shildi!\n\n{text}"
-    await message.answer(success_text, parse_mode="Markdown", reply_markup=keyboard)
+    await message.answer(success_text, parse_mode="HTML", reply_markup=keyboard)
     await state.clear()
 
 
@@ -693,7 +693,7 @@ async def on_admin_back(callback: CallbackQuery, lang: str = "uz"):
 
     await callback.answer()
     text = await get_message("admin_welcome", lang)
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
 
 
 @router.callback_query(F.data == "admin_close")
