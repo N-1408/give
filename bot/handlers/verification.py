@@ -91,16 +91,12 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
                     missing_channels.append(f"📢 {ch_name}")
 
         elif ch_type == "instagram":
-            # 📸 Instagram: Fake check logic. Warn first time, pass second time.
-            if not user.get("instagram_clicked"):
-                missing_channels.append(f"📸 {ch_name}")
-                await db.update_user_field(user_id, "instagram_clicked", True)
+            # 📸 Instagram: No check performed
+            pass
 
         elif ch_type == "youtube":
-            # ▶️ YouTube: Fake check logic. Warn first time, pass second time.
-            if not user.get("youtube_clicked"):
-                missing_channels.append(f"▶️ {ch_name}")
-                await db.update_user_field(user_id, "youtube_clicked", True)
+            # ▶️ YouTube: No check performed
+            pass
 
     # ❌ If missing channels — show alert + keep current message
     if missing_channels:
