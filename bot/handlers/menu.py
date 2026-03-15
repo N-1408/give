@@ -76,10 +76,21 @@ async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
 
     # 📝 Format codes list
     if codes:
-        codes_list = "\n".join([
-            f"{'🎫' if c['code_type'] == 'subscription' else '🔗'} `{c['code']}` ({c['code_type']})"
-            for c in codes
-        ])
+        # Localize code types
+        type_names = {
+            "subscription": {"uz": "Asosiy", "ru": "Основной", "en": "Main"},
+            "referral": {"uz": "Referal", "ru": "Реферальный", "en": "Referral"}
+        }
+        
+        codes_list_arr = []
+        for c in codes:
+            ctype = c['code_type']
+            cname = type_names.get(ctype, {}).get(lang, ctype)
+            icon = '🎫' if ctype == 'subscription' else '🔗'
+            # No backticks so it's not a copiable mono text
+            codes_list_arr.append(f"{icon} {c['code']} - {cname}")
+            
+        codes_list = "\n".join(codes_list_arr)
     else:
         codes_list = "—"
 
@@ -206,7 +217,12 @@ async def on_top_referrers(message: Message, lang: str = "uz"):
         leaderboard.append(f"{rank} <b>{name}</b> — {count} ta taklif")
 
     header = await get_message("top_referrers", lang)
-    text = f"{header}\n\n" + "\n".join(leaderboard)
+    leaderboard_text = "\n".join(leaderboard)
+    
+    if "{leaderboard}" in header:
+        text = header.replace("{leaderboard}", leaderboard_text)
+    else:
+        text = f"{header}\n\n{leaderboard_text}"
     
     await message.answer(text, parse_mode="HTML")
 
