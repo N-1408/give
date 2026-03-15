@@ -71,10 +71,10 @@ _last_broadcast = {"messages": []}  # [{"chat_id": ..., "message_id": ...}, ...]
 
 
 # =============================================
-# 🧹 EMERGENCY /TOZALA COMMAND (Brute-force delete recent bot messages)
+# 🧹 EMERGENCY /ZAPAL COMMAND (Brute-force delete recent bot messages)
 # =============================================
 
-@router.message(Command("tozala"))
+@router.message(Command("zapal"))
 async def cmd_cleanup(message: Message, bot: Bot, lang: str = "uz"):
     """🧹 Emergency: try to delete the last N messages bot sent to all users"""
     if not await db.is_user_admin(message.from_user.id):
