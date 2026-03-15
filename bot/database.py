@@ -9,8 +9,12 @@
 # ============================================
 # 📋 CHANGE LOG:
 # [2026-03-15 08:26 Tashkent] - Added channel add/remove/toggle functions
+# [2026-03-15 08:41 Tashkent] - Fixed Render connection: added SSL support
+#   and retry mechanism for Supabase connection
 # ============================================
 
+import ssl
+import asyncio
 import asyncpg
 import logging
 from typing import Optional, List, Dict, Any
@@ -27,20 +31,39 @@ _pool: Optional[asyncpg.Pool] = None
 # 🔌 CONNECTION MANAGEMENT
 # =============================================
 
+def _create_ssl_context():
+    """🔒 Create SSL context for Supabase connection"""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 async def init_db():
-    """🔌 Initialize the database connection pool"""
+    """🔌 Initialize the database connection pool with SSL + retry"""
     global _pool
-    try:
-        _pool = await asyncpg.create_pool(
-            dsn=config.SUPABASE_DB_URL,
-            min_size=2,
-            max_size=10,
-            command_timeout=30
-        )
-        logger.info("✅ Database connection pool created successfully")
-    except Exception as e:
-        logger.error(f"❌ Failed to create database pool: {e}")
-        raise
+    max_retries = 3
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            _pool = await asyncpg.create_pool(
+                dsn=config.SUPABASE_DB_URL,
+                min_size=2,
+                max_size=10,
+                command_timeout=30,
+                ssl=_create_ssl_context()  # 🔒 SSL required for Supabase
+            )
+            logger.info("✅ Database connection pool created successfully")
+            return
+        except Exception as e:
+            logger.error(f"❌ Attempt {attempt}/{max_retries} - Failed to create database pool: {e}")
+            if attempt < max_retries:
+                wait = attempt * 3  # ⏳ 3s, 6s exponential backoff
+                logger.info(f"⏳ Retrying in {wait}s...")
+                await asyncio.sleep(wait)
+            else:
+                logger.error("❌ All connection attempts failed!")
+                raise
 
 
 async def close_db():
