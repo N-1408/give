@@ -96,8 +96,8 @@ async def on_startup(bot: Bot):
 
 async def on_shutdown(bot: Bot):
     """🔌 Actions to perform on bot shutdown"""
-    if config.BOT_MODE == "webhook":
-        await bot.delete_webhook()
+    # ⚠️ Do NOT delete_webhook() here! Render does rolling updates.
+    # If the old container deletes the webhook on shutdown, it breaks the new container.
     await db.close_db()
     logger.info("🔌 Bot shutdown complete")
 
