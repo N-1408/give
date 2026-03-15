@@ -7,6 +7,10 @@
 #    inline keyboards (language, channels, admin panel).
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# 📋 CHANGE LOG:
+# [2026-03-15 09:18 Tashkent] - Removed Top referallar & Adminga murojaat
+#   from menu. Added admin reply keyboard. Simplified main menu to 2 rows.
+# ============================================
 
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
@@ -103,26 +107,23 @@ def get_channels_keyboard(channels: List[dict], language: str = "uz") -> InlineK
 
 
 # =============================================
-# 📋 MAIN MENU
+# 📋 MAIN MENU (for regular users)
 # =============================================
 
 def get_main_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
-    """📋 Main menu reply keyboard"""
+    """📋 Main menu reply keyboard (users only)"""
     menus = {
         "uz": [
             ["🎟️ Mening imkoniyatlarim", "🔗 Referal linkim"],
-            ["🏆 Top referallar", "📋 Qoidalar"],
-            ["🎁 Sovrinlar", "📩 Adminga murojaat"]
+            ["📋 Qoidalar", "🎁 Sovrinlar"],
         ],
         "ru": [
             ["🎟️ Мои шансы", "🔗 Моя реферальная ссылка"],
-            ["🏆 Топ рефералы", "📋 Правила"],
-            ["🎁 Призы", "📩 Связаться с админом"]
+            ["📋 Правила", "🎁 Призы"],
         ],
         "en": [
             ["🎟️ My chances", "🔗 My referral link"],
-            ["🏆 Top referrers", "📋 Rules"],
-            ["🎁 Prizes", "📩 Contact admin"]
+            ["📋 Rules", "🎁 Prizes"],
         ]
     }
 
@@ -133,7 +134,43 @@ def get_main_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
 
 
 # =============================================
-# 👑 ADMIN PANEL
+# 👑 ADMIN REPLY MENU (replaces user menu for admins)
+# =============================================
+
+def get_admin_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
+    """👑 Admin reply keyboard — shown instead of user menu"""
+    menus = {
+        "uz": [
+            ["📊 Statistika", "📥 Excel yuklab olish"],
+            ["📢 Broadcast", "🔄 Kanal sozlamalari"],
+            ["📝 Textlarni o'zgartirish"],
+            ["🎟️ Mening imkoniyatlarim", "🔗 Referal linkim"],
+            ["📋 Qoidalar", "🎁 Sovrinlar"],
+        ],
+        "ru": [
+            ["📊 Статистика", "📥 Скачать Excel"],
+            ["📢 Рассылка", "🔄 Каналы"],
+            ["📝 Редактировать тексты"],
+            ["🎟️ Мои шансы", "🔗 Моя реферальная ссылка"],
+            ["📋 Правила", "🎁 Призы"],
+        ],
+        "en": [
+            ["📊 Statistics", "📥 Download Excel"],
+            ["📢 Broadcast", "🔄 Channel settings"],
+            ["📝 Edit texts"],
+            ["🎟️ My chances", "🔗 My referral link"],
+            ["📋 Rules", "🎁 Prizes"],
+        ]
+    }
+
+    menu = menus.get(language, menus["uz"])
+    keyboard = [[KeyboardButton(text=btn) for btn in row] for row in menu]
+
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+
+# =============================================
+# 👑 ADMIN INLINE PANEL (for inline actions)
 # =============================================
 
 def get_admin_keyboard(language: str = "uz") -> InlineKeyboardMarkup:
@@ -183,7 +220,6 @@ def get_text_keys_keyboard() -> InlineKeyboardMarkup:
         ("my_chances", "🎟️ My Chances"),
         ("rules", "📋 Rules"),
         ("prizes", "🎁 Prizes"),
-        ("contact_admin", "📩 Contact Admin"),
         ("already_registered", "⚠️ Already Registered"),
         ("not_verified", "❌ Not Verified"),
     ]

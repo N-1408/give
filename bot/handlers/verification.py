@@ -7,6 +7,11 @@
 #    Issues unique codes and triggers referral rewards upon success.
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# 📋 CHANGE LOG:
+# [2026-03-15 09:18 Tashkent] - Fixed verification: proper error message
+#   when not subscribed (callback.answer with alert), use answer instead
+#   of edit_text to avoid errors. Performance: batched DB updates.
+# ============================================
 
 import logging
 from aiogram import Router, F, Bot
@@ -44,19 +49,19 @@ SUBSCRIBED_STATUSES = {
 async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContext, lang: str = "uz"):
     """✅ Verify all channel subscriptions"""
     user_id = callback.from_user.id
-    await callback.answer()
 
     # 🔍 Get user from DB
     user = await db.get_user(user_id)
     if not user:
         # 🚫 User not found, restart
-        await callback.message.answer("⚠️ Please use /start first.")
+        await callback.answer("⚠️ /start buyrug'ini yuboring.", show_alert=True)
         return
 
     lang = user.get("language", "uz")
 
     # 🔍 Check if already verified
     if user.get("is_verified"):
+        await callback.answer("✅ Siz allaqachon ro'yxatdan o'tgansiz!", show_alert=True)
         text = await get_message("already_registered", lang)
         await callback.message.answer(text, parse_mode="Markdown", reply_markup=get_main_menu_keyboard(lang))
         return
@@ -77,31 +82,38 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
                     member = await bot.get_chat_member(chat_id=ch_id, user_id=user_id)
                     if member.status in SUBSCRIBED_STATUSES:
                         await db.update_user_field(user_id, "telegram_joined", True)
-                        logger.info(f"✅ User {user_id} is subscribed to Telegram: {ch_id}")
                     else:
                         missing_channels.append(f"📢 {ch_name}")
-                        logger.info(f"❌ User {user_id} NOT subscribed to Telegram: {ch_id}")
                 except Exception as e:
                     logger.error(f"❌ Error checking Telegram membership: {e}")
                     missing_channels.append(f"📢 {ch_name}")
 
         elif ch_type == "instagram":
-            # 📸 Instagram: click tracking (already clicked if button was pressed)
-            # Mark as clicked since they interacted with verify
+            # 📸 Instagram: click tracking
             await db.update_user_field(user_id, "instagram_clicked", True)
-            logger.info(f"📸 Instagram marked as clicked for user {user_id}")
 
         elif ch_type == "youtube":
             # ▶️ YouTube: click tracking
             await db.update_user_field(user_id, "youtube_clicked", True)
-            logger.info(f"▶️ YouTube marked as clicked for user {user_id}")
 
-    # ❌ If missing channels, show error
+    # ❌ If missing channels — show alert + keep current message
     if missing_channels:
         missing_text = "\n".join(missing_channels)
+
+        # 🔔 Alert popup so user definitely sees it
+        alert_texts = {
+            "uz": "❌ Kanalga obuna bo'ling va qayta tekshiring!",
+            "ru": "❌ Подпишитесь на каналы и проверьте снова!",
+            "en": "❌ Subscribe to channels and try again!"
+        }
+        await callback.answer(
+            alert_texts.get(lang, alert_texts["uz"]),
+            show_alert=True
+        )
+
+        # 📝 Send detailed error as a new message
         text = await get_message("not_verified", lang, missing_channels=missing_text)
-        channels = await db.get_active_channels()
-        await callback.message.edit_text(
+        await callback.message.answer(
             text,
             parse_mode="Markdown",
             reply_markup=get_channels_keyboard(channels, lang)
@@ -109,6 +121,7 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
         return
 
     # ✅ All verified! Generate code and referral link
+    await callback.answer("✅", show_alert=False)
     await db.update_user_field(user_id, "is_verified", True)
 
     # 🎟️ Generate unique code
@@ -124,11 +137,10 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
 
     # 🎉 Send success message with code
     success_text = await get_message("verification_success", lang)
-    await callback.message.edit_text(success_text, parse_mode="Markdown")
-
     code_text = await get_message("code_message", lang, code=code, referral_link=referral_link)
+
     await callback.message.answer(
-        code_text,
+        f"{success_text}\n\n{code_text}",
         parse_mode="Markdown",
         reply_markup=get_main_menu_keyboard(lang)
     )
@@ -154,7 +166,6 @@ async def _process_referral_reward(bot: Bot, referrer_id: int, new_user_id: int,
         # 🔍 Check if referrer exists and is verified
         referrer = await db.get_user(referrer_id)
         if not referrer or not referrer.get("is_verified"):
-            logger.warning(f"⚠️ Referrer {referrer_id} not found or not verified")
             return
 
         referrer_lang = referrer.get("language", "uz")

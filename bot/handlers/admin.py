@@ -9,8 +9,12 @@
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
 # 📋 CHANGE LOG:
-# [2026-03-15 08:26 Tashkent] - Added full channel management:
-#   add/remove/toggle channels from admin panel
+# [2026-03-15 08:26 Tashkent] - Added full channel management
+# [2026-03-15 09:18 Tashkent] - Fixed /shep welcome text to 'Xush kelibsiz, Shep!'
+#   Admin reply keyboard shown after login. Fixed admin_close action.
+# [2026-03-15 09:28 Tashkent] - Broadcast upgraded to use `copy_message`,
+#   supporting all media types (video, document, etc).
+#   Added cache clearing when admin edits text.
 # ============================================
 
 import os
@@ -31,14 +35,16 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 from bot import database as db
+from bot.code_generator import generate_unique_code
 from bot.config import config
-from bot.texts.messages import get_message
+from bot.texts.messages import get_message, clear_text_cache
 from bot.keyboards.keyboards import (
     get_admin_keyboard,
     get_text_keys_keyboard,
     get_language_select_keyboard,
     get_confirm_broadcast_keyboard,
     get_main_menu_keyboard,
+    get_admin_menu_keyboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,9 +78,12 @@ async def cmd_shep(message: Message, state: FSMContext, lang: str = "uz"):
     is_admin = await db.is_user_admin(message.from_user.id)
 
     if is_admin:
-        # 👑 Already admin, show panel
-        text = await get_message("admin_welcome", lang)
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+        # 👑 Already admin, show admin reply keyboard + inline panel
+        await message.answer(
+            "👑 *Xush kelibsiz, Shep!*",
+            parse_mode="Markdown",
+            reply_markup=get_admin_menu_keyboard(lang)
+        )
         return
 
     # 🔐 Ask for password
@@ -91,8 +100,12 @@ async def on_password_entered(message: Message, state: FSMContext, lang: str = "
         await db.set_admin(message.from_user.id, True)
         logger.info(f"👑 New admin: {message.from_user.id} ({message.from_user.first_name})")
 
-        text = await get_message("admin_welcome", lang)
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+        # 👑 Show admin reply keyboard
+        await message.answer(
+            "👑 *Xush kelibsiz, Shep!*",
+            parse_mode="Markdown",
+            reply_markup=get_admin_menu_keyboard(lang)
+        )
         await state.clear()
     else:
         # ❌ Wrong password
@@ -204,6 +217,8 @@ async def on_new_text_with_photo(message: Message, state: FSMContext, lang: str 
     caption = message.caption or ""
 
     await db.update_text(text_key, target_lang, caption, photo_id)
+    clear_text_cache()  # 🧹 Clear text cache
+
     text = await get_message("text_updated", lang)
     await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
     await state.clear()
@@ -221,6 +236,8 @@ async def on_new_text(message: Message, state: FSMContext, lang: str = "uz"):
         return
 
     await db.update_text(text_key, target_lang, message.text)
+    clear_text_cache()  # 🧹 Clear text cache
+
     text = await get_message("text_updated", lang)
     await message.answer(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
     await state.clear()
@@ -363,42 +380,24 @@ async def on_admin_broadcast(callback: CallbackQuery, state: FSMContext, lang: s
     await state.set_state(AdminStates.broadcast_compose)
 
 
-@router.message(AdminStates.broadcast_compose, F.photo)
-async def on_broadcast_photo(message: Message, state: FSMContext, lang: str = "uz"):
-    """📢 Admin composed broadcast with photo"""
-    photo_id = message.photo[-1].file_id
-    caption = message.caption or ""
-
+@router.message(AdminStates.broadcast_compose)
+async def on_broadcast_message(message: Message, state: FSMContext, lang: str = "uz"):
+    """📢 Admin composed any kind of broadcast message (text/photo/video/etc)"""
     await state.update_data(
-        broadcast_photo_id=photo_id,
-        broadcast_text=caption,
-        broadcast_type="photo"
+        broadcast_msg_id=message.message_id,
+        broadcast_from_chat=message.chat.id
     )
 
     confirm_text = await get_message("broadcast_confirm", lang)
-    await message.answer_photo(
-        photo=photo_id,
-        caption=f"{confirm_text}\n\n{caption}",
-        parse_mode="Markdown",
-        reply_markup=get_confirm_broadcast_keyboard(lang)
-    )
-    await state.set_state(AdminStates.broadcast_confirm)
-
-
-@router.message(AdminStates.broadcast_compose, F.text)
-async def on_broadcast_text(message: Message, state: FSMContext, lang: str = "uz"):
-    """📢 Admin composed text-only broadcast"""
-    await state.update_data(
-        broadcast_text=message.text,
-        broadcast_type="text"
-    )
-
-    confirm_text = await get_message("broadcast_confirm", lang)
+    
+    # 🖼️ Show preview by copying the message
+    await message.copy_to(chat_id=message.chat.id)
     await message.answer(
-        f"{confirm_text}\n\n{message.text}",
+        confirm_text,
         parse_mode="Markdown",
         reply_markup=get_confirm_broadcast_keyboard(lang)
     )
+    
     await state.set_state(AdminStates.broadcast_confirm)
 
 
@@ -411,9 +410,13 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
 
     await callback.answer()
     state_data = await state.get_data()
-    broadcast_text = state_data.get("broadcast_text", "")
-    broadcast_type = state_data.get("broadcast_type", "text")
-    photo_id = state_data.get("broadcast_photo_id")
+    msg_id = state_data.get("broadcast_msg_id")
+    from_chat = state_data.get("broadcast_from_chat")
+
+    if not msg_id or not from_chat:
+        await callback.message.answer("❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.")
+        await state.clear()
+        return
 
     # 📋 Get all user IDs
     user_ids = await db.get_all_user_ids()
@@ -428,10 +431,8 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
 
     for i, uid in enumerate(user_ids):
         try:
-            if broadcast_type == "photo" and photo_id:
-                await bot.send_photo(uid, photo=photo_id, caption=broadcast_text, parse_mode="Markdown")
-            else:
-                await bot.send_message(uid, broadcast_text, parse_mode="Markdown")
+            # 🚀 COPY MESSAGE - Native support for all media types and formatting!
+            await bot.copy_message(chat_id=uid, from_chat_id=from_chat, message_id=msg_id)
             sent += 1
         except Exception as e:
             error_text = str(e).lower()
@@ -697,10 +698,18 @@ async def on_admin_back(callback: CallbackQuery, lang: str = "uz"):
 
 @router.callback_query(F.data == "admin_close")
 async def on_admin_close(callback: CallbackQuery, lang: str = "uz"):
-    """🔙 Close admin panel, back to main menu"""
+    """🔙 Close admin panel, back to admin reply menu"""
     await callback.answer()
     await callback.message.delete()
-    await callback.message.answer(
-        "📋 Main menu:",
-        reply_markup=get_main_menu_keyboard(lang)
-    )
+    # 👑 Show admin reply keyboard if admin, else user menu
+    is_admin = await db.is_user_admin(callback.from_user.id)
+    if is_admin:
+        await callback.message.answer(
+            "👑 Admin panel",
+            reply_markup=get_admin_menu_keyboard(lang)
+        )
+    else:
+        await callback.message.answer(
+            "📋 Menu",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
