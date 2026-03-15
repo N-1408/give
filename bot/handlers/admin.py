@@ -66,6 +66,9 @@ class AdminStates(StatesGroup):
 # 🛤️ Router
 router = Router()
 
+# 📨 Store last broadcast message IDs for deletion
+_last_broadcast = {"messages": []}  # [{"chat_id": ..., "message_id": ...}, ...]
+
 
 # =============================================
 # 🔐 SECRET /SHEP COMMAND (HIDDEN)
@@ -450,6 +453,9 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
     started_text = await get_message("broadcast_started", lang, total=total)
     progress_msg = await callback.message.edit_text(started_text, parse_mode="HTML")
 
+    # 🧹 Clear previous broadcast message IDs
+    _last_broadcast["messages"] = []
+
     sent = 0
     failed = 0
     blocked = 0
@@ -457,8 +463,10 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
     for i, uid in enumerate(user_ids):
         try:
             # 🚀 COPY MESSAGE - Native support for all media types and formatting!
-            await bot.copy_message(chat_id=uid, from_chat_id=from_chat, message_id=msg_id)
+            result = await bot.copy_message(chat_id=uid, from_chat_id=from_chat, message_id=msg_id)
             sent += 1
+            # 💾 Store message ID for potential deletion
+            _last_broadcast["messages"].append({"chat_id": uid, "message_id": result.message_id})
         except Exception as e:
             error_text = str(e).lower()
             if "blocked" in error_text or "deactivated" in error_text:
@@ -483,10 +491,17 @@ async def on_broadcast_confirmed(callback: CallbackQuery, bot: Bot, state: FSMCo
 
     # ✅ Broadcast complete
     done_text = await get_message("broadcast_done", lang, sent=sent, failed=failed, blocked=blocked)
-    await progress_msg.edit_text(done_text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
+    
+    # 🗑️ Add delete button to the result message
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    done_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🗑️ Oxirgi broadcastni o'chirish", callback_data="delete_last_broadcast")],
+        [InlineKeyboardButton(text="👑 Admin panel", callback_data="admin_panel")],
+    ])
+    await progress_msg.edit_text(done_text, parse_mode="HTML", reply_markup=done_kb)
     await state.clear()
 
-    logger.info(f"📢 Broadcast done: sent={sent}, failed={failed}, blocked={blocked}")
+    logger.info(f"📢 Broadcast done: sent={sent}, failed={failed}, blocked={blocked}. Stored {len(_last_broadcast['messages'])} message IDs.")
 
 
 @router.callback_query(F.data == "broadcast_cancel")
@@ -496,6 +511,54 @@ async def on_broadcast_cancelled(callback: CallbackQuery, state: FSMContext, lan
     await state.clear()
     text = await get_message("admin_welcome", lang)
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_keyboard(lang))
+
+
+@router.callback_query(F.data == "delete_last_broadcast")
+async def on_delete_broadcast(callback: CallbackQuery, bot: Bot, lang: str = "uz"):
+    """🗑️ Delete all messages from the last broadcast"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    messages = _last_broadcast.get("messages", [])
+    if not messages:
+        await callback.answer("❌ O'chiriladigan xabar topilmadi!", show_alert=True)
+        return
+
+    await callback.answer()
+    total = len(messages)
+    deleted = 0
+    failed = 0
+
+    await callback.message.edit_text(
+        f"🗑️ O'chirilmoqda... 0/{total}",
+        parse_mode="HTML"
+    )
+
+    for i, entry in enumerate(messages):
+        try:
+            await bot.delete_message(chat_id=entry["chat_id"], message_id=entry["message_id"])
+            deleted += 1
+        except Exception as e:
+            failed += 1
+            logger.debug(f"🗑️ Delete failed for {entry}: {e}")
+
+        # ⏱️ Rate limiting
+        if (i + 1) % 25 == 0:
+            await asyncio.sleep(1)
+
+    # 🧹 Clear stored messages
+    _last_broadcast["messages"] = []
+
+    await callback.message.edit_text(
+        f"✅ <b>Broadcast xabarlari o'chirildi!</b>\n\n"
+        f"🗑️ O'chirildi: {deleted}\n"
+        f"❌ Xato: {failed}\n"
+        f"📊 Jami: {total}",
+        parse_mode="HTML",
+        reply_markup=get_admin_keyboard(lang)
+    )
+    logger.info(f"🗑️ Broadcast deleted: {deleted}/{total}")
 
 
 # =============================================
