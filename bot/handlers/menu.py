@@ -78,8 +78,8 @@ async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
     if codes:
         # Localize code types
         type_names = {
-            "subscription": {"uz": "Asosiy", "ru": "Основной", "en": "Main"},
-            "referral": {"uz": "Referal", "ru": "Реферальный", "en": "Referral"}
+            "subscription": {"uz": "(obuna uchun)", "ru": "(за подписку)", "en": "(for subscription)"},
+            "referral": {"uz": "(referal uchun)", "ru": "(за реферала)", "en": "(for referral)"}
         }
         
         codes_list_arr = []
@@ -88,7 +88,7 @@ async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
             cname = type_names.get(ctype, {}).get(lang, ctype)
             icon = '🎫' if ctype == 'subscription' else '🔗'
             # No backticks so it's not a copiable mono text
-            codes_list_arr.append(f"{icon} {c['code']} - {cname}")
+            codes_list_arr.append(f"{icon} {c['code']} {cname}")
             
         codes_list = "\n".join(codes_list_arr)
     else:
