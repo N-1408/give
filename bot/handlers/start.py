@@ -110,7 +110,7 @@ async def on_language_selected(callback: CallbackQuery, state: FSMContext, bot: 
     user = await db.get_user(callback.from_user.id)
     if user and user.get("phone"):
         # 🔄 Update existing user's language
-        await db.update_user_field(user.id, "language", lang)
+        await db.update_user_field(user['telegram_id'], "language", lang)
         
         # 📝 Send success message and new menu
         from bot.keyboards.keyboards import get_main_menu_keyboard

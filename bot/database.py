@@ -272,7 +272,7 @@ async def get_top_referrers(limit: int = 10) -> List[dict]:
                 u.username,
                 COUNT(c.id) as ref_count
             FROM users u
-            JOIN codes c ON u.telegram_id = c.referred_user_id
+            JOIN codes c ON c.user_id = u.telegram_id
             WHERE c.code_type = 'referral'
             GROUP BY u.telegram_id
             ORDER BY ref_count DESC

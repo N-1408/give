@@ -161,7 +161,8 @@ async def on_prizes(message: Message, lang: str = "uz"):
 # =============================================
 
 @router.message(F.text.in_({
-    "⚙️ Sozlamalar", "⚙️ Настройки", "⚙️ Settings"
+    "⚙️ Sozlamalar", "⚙️ Настройки", "⚙️ Settings",
+    "🌐 Tilni o'zgartirish", "🌐 Сменить язык", "🌐 Change language"
 }))
 async def on_settings(message: Message, lang: str = "uz"):
     """⚙️ Show settings menu (Language selection)"""

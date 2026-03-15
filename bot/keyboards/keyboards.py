@@ -111,17 +111,17 @@ def get_main_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
         "uz": [
             ["🎟️ Mening imkoniyatlarim", "🔗 Referal linkim"],
             ["📋 Qoidalar", "🎁 Sovrinlar"],
-            ["🏆 Top Referallar", "⚙️ Sozlamalar"],
+            ["🏆 Top Referallar", "🌐 Tilni o'zgartirish"],
         ],
         "ru": [
             ["🎟️ Мои шансы", "🔗 Моя реферальная ссылка"],
             ["📋 Правила", "🎁 Призы"],
-            ["🏆 Топ Рефералов", "⚙️ Настройки"],
+            ["🏆 Топ Рефералов", "🌐 Сменить язык"],
         ],
         "en": [
             ["🎟️ My chances", "🔗 My referral link"],
             ["📋 Rules", "🎁 Prizes"],
-            ["🏆 Top Referrals", "⚙️ Settings"],
+            ["🏆 Top Referrals", "🌐 Change language"],
         ]
     }
 

@@ -137,11 +137,31 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
         )
         return
 
-    # ✅ All verified! Generate code and referral link
+    # ✅ All verified! Mark user as verified
     await callback.answer("✅", show_alert=False)
     await db.update_user_field(user_id, "is_verified", True)
 
-    # 🎟️ Generate unique code
+    # 🛡️ ANTI-CHEAT: Check if user already has a subscription code
+    existing_codes = await db.get_user_codes(user_id)
+    has_subscription_code = any(c.get("code_type") == "subscription" for c in existing_codes)
+
+    if has_subscription_code:
+        # 🔄 Re-verification (user left and came back). No new code!
+        texts = {
+            "uz": "✅ Obunangiz tasdiqlandi! Asosiy menyuga qaytdingiz.",
+            "ru": "✅ Подписка подтверждена! Вы вернулись в главное меню.",
+            "en": "✅ Subscription confirmed! You are back to the main menu.",
+        }
+        await callback.message.answer(
+            texts.get(lang, texts["uz"]),
+            parse_mode="HTML",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+        logger.info(f"🔄 Re-verification (no new code) for user {user_id}")
+        await state.clear()
+        return
+
+    # 🌟 FIRST-TIME verification: Generate code and referral link
     code = await generate_unique_code()
     await db.save_code(
         user_id=user_id,
@@ -162,9 +182,9 @@ async def on_verify_channels(callback: CallbackQuery, bot: Bot, state: FSMContex
         reply_markup=get_main_menu_keyboard(lang)
     )
 
-    logger.info(f"🎟️ Code issued to user {user_id}: {code}")
+    logger.info(f"🎟️ First-time code issued to user {user_id}: {code}")
 
-    # 🔗 Process referral reward
+    # 🔗 Process referral reward (ONLY on first verification)
     referrer_id = user.get("referrer_id")
     if referrer_id:
         await _process_referral_reward(bot, referrer_id, user_id, callback.from_user)
