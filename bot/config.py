@@ -7,6 +7,9 @@
 #    bot configuration, database credentials, and settings.
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# 📋 CHANGE LOG:
+# [2026-03-15 08:26 Tashkent] - Changed default TG channel to @makemarketing_uz
+# ============================================
 
 import os
 from dotenv import load_dotenv
@@ -39,9 +42,9 @@ class Config:
     # 📢 Default channel info (fallback if DB is empty)
     DEFAULT_CHANNELS = {
         "telegram": {
-            "id": "@aliypubgm",
-            "url": "https://t.me/aliypubgm",
-            "name": "Aliy PUBGM"
+            "id": "@makemarketing_uz",
+            "url": "https://t.me/makemarketing_uz",
+            "name": "Make Marketing UZ"
         },
         "instagram": {
             "url": "https://www.instagram.com/aliypubgm_",

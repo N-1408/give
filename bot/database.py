@@ -7,6 +7,9 @@
 #    Provides CRUD operations for users, codes, texts, and channels.
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# 📋 CHANGE LOG:
+# [2026-03-15 08:26 Tashkent] - Added channel add/remove/toggle functions
+# ============================================
 
 import asyncpg
 import logging
@@ -339,6 +342,52 @@ async def update_channel(channel_id: int, **kwargs):
             f"UPDATE channels SET {', '.join(updates)} WHERE id = ${idx}",
             *values
         )
+
+
+async def add_channel(channel_type: str, channel_url: str, channel_name: str, channel_id: str = None) -> dict:
+    """➕ Add a new channel"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            INSERT INTO channels (channel_type, channel_id, channel_url, channel_name, is_active)
+            VALUES ($1, $2, $3, $4, TRUE)
+            RETURNING *
+        """, channel_type, channel_id, channel_url, channel_name)
+        return dict(row) if row else {}
+
+
+async def remove_channel(channel_db_id: int):
+    """🗑️ Remove a channel by its database ID"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM channels WHERE id = $1", channel_db_id)
+
+
+async def toggle_channel(channel_db_id: int) -> bool:
+    """🔄 Toggle channel active/inactive, returns new state"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            UPDATE channels SET is_active = NOT is_active
+            WHERE id = $1 RETURNING is_active
+        """, channel_db_id)
+        return row["is_active"] if row else False
+
+
+async def get_channel_by_id(channel_db_id: int) -> Optional[dict]:
+    """🔍 Get a channel by its database ID"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM channels WHERE id = $1", channel_db_id)
+        return dict(row) if row else None
+
+
+async def get_all_channels() -> List[dict]:
+    """📢 Get ALL channels (active and inactive)"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM channels ORDER BY id")
+        return [dict(row) for row in rows]
 
 
 # =============================================

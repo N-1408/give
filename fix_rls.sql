@@ -1,22 +1,24 @@
 -- ============================================
--- 🎁 Telegram Giveaway Bot - Full Database Schema
--- 📁 File: schema.sql
+-- 🎁 Telegram Giveaway Bot - FIX SQL
+-- 📁 File: fix_rls.sql
 -- 👤 Created by: User with AI
--- 📝 Complete Supabase PostgreSQL schema for the giveaway bot.
---    Includes users, codes, channels, dynamic texts, and settings.
---    Run this SQL in Supabase SQL Editor to initialize the database.
--- 📅 Created: 2026-03-15 07:47 (Tashkent Time)
+-- 📝 Run this in Supabase SQL Editor to fix RLS errors.
+--    Drops ALL old tables and recreates them properly
+--    with RLS enabled and correct policies.
+-- 📅 Created: 2026-03-15 08:26 (Tashkent Time)
 -- ============================================
--- 📋 CHANGE LOG:
--- [2026-03-15 08:06 Tashkent] - Disabled RLS (caused errors)
--- [2026-03-15 08:26 Tashkent] - Enabled RLS with proper policies
---   for postgres/service_role. Changed TG channel to @makemarketing_uz
--- ============================================
+
+-- ⚠️ DROP ALL OLD TABLES (clean start)
+DROP TABLE IF EXISTS codes CASCADE;
+DROP TABLE IF EXISTS bot_texts CASCADE;
+DROP TABLE IF EXISTS bot_settings CASCADE;
+DROP TABLE IF EXISTS channels CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- =============================================
 -- 👤 USERS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     telegram_id BIGINT UNIQUE NOT NULL,
     username VARCHAR(255),
@@ -37,7 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- =============================================
 -- 🎟️ CODES TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS codes (
+CREATE TABLE codes (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
     code VARCHAR(10) UNIQUE NOT NULL,
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS codes (
 -- =============================================
 -- 📢 CHANNELS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS channels (
+CREATE TABLE channels (
     id SERIAL PRIMARY KEY,
     channel_type VARCHAR(20) NOT NULL,
     channel_id VARCHAR(255),
@@ -62,7 +64,7 @@ CREATE TABLE IF NOT EXISTS channels (
 -- =============================================
 -- 📝 BOT TEXTS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS bot_texts (
+CREATE TABLE bot_texts (
     id SERIAL PRIMARY KEY,
     text_key VARCHAR(100) NOT NULL,
     language VARCHAR(10) NOT NULL,
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS bot_texts (
 -- =============================================
 -- ⚙️ BOT SETTINGS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS bot_settings (
+CREATE TABLE bot_settings (
     key VARCHAR(100) PRIMARY KEY,
     value TEXT NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -83,47 +85,58 @@ CREATE TABLE IF NOT EXISTS bot_settings (
 
 -- =============================================
 -- 🔐 ROW LEVEL SECURITY — ENABLE + POLICIES
--- RLS ON → blocks PostgREST anon access
--- Policies allow postgres/service_role only
+-- This fixes the Security Advisor errors properly:
+-- RLS is ON (tables protected from PostgREST anon access)
+-- Policies allow postgres role (asyncpg direct connection)
 -- =============================================
+
+-- 👤 users
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_users" ON users
-    FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+    FOR ALL TO postgres, service_role
+    USING (true) WITH CHECK (true);
 
+-- 🎟️ codes
 ALTER TABLE codes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_codes" ON codes
-    FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+    FOR ALL TO postgres, service_role
+    USING (true) WITH CHECK (true);
 
+-- 📢 channels
 ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_channels" ON channels
-    FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+    FOR ALL TO postgres, service_role
+    USING (true) WITH CHECK (true);
 
+-- 📝 bot_texts
 ALTER TABLE bot_texts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_bot_texts" ON bot_texts
-    FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+    FOR ALL TO postgres, service_role
+    USING (true) WITH CHECK (true);
 
+-- ⚙️ bot_settings
 ALTER TABLE bot_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_bot_settings" ON bot_settings
-    FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+    FOR ALL TO postgres, service_role
+    USING (true) WITH CHECK (true);
 
 -- =============================================
 -- 📊 INDEXES
 -- =============================================
-CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
-CREATE INDEX IF NOT EXISTS idx_users_referrer_id ON users(referrer_id);
-CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
-CREATE INDEX IF NOT EXISTS idx_codes_user_id ON codes(user_id);
-CREATE INDEX IF NOT EXISTS idx_codes_code ON codes(code);
-CREATE INDEX IF NOT EXISTS idx_bot_texts_key_lang ON bot_texts(text_key, language);
+CREATE INDEX idx_users_telegram_id ON users(telegram_id);
+CREATE INDEX idx_users_referrer_id ON users(referrer_id);
+CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_codes_user_id ON codes(user_id);
+CREATE INDEX idx_codes_code ON codes(code);
+CREATE INDEX idx_bot_texts_key_lang ON bot_texts(text_key, language);
 
 -- =============================================
--- 📢 DEFAULT CHANNELS
+-- 📢 DEFAULT CHANNELS (makemarketing_uz vaqtinchalik)
 -- =============================================
 INSERT INTO channels (channel_type, channel_id, channel_url, channel_name, is_active) VALUES
     ('telegram', '@makemarketing_uz', 'https://t.me/makemarketing_uz', 'Make Marketing UZ', TRUE),
     ('instagram', NULL, 'https://www.instagram.com/aliypubgm_', 'aliypubgm_', TRUE),
-    ('youtube', NULL, 'https://www.youtube.com/@aliypubgm', 'Aliy PUBGM', TRUE)
-ON CONFLICT DO NOTHING;
+    ('youtube', NULL, 'https://www.youtube.com/@aliypubgm', 'Aliy PUBGM', TRUE);
 
 -- =============================================
 -- 📝 DEFAULT BOT TEXTS — UZBEK
@@ -197,10 +210,11 @@ Obuna bo''lib, qayta "✅ Tekshirish" tugmasini bosing.'),
     ('top_referrers', 'uz', '🏆 *Top Referallar*
 
 {leaderboard}'),
-    ('broadcast_confirm', 'uz', '📢 Xabar barcha foydalanuvchilarga yuborilsinmi?\n\n{message}')
-ON CONFLICT (text_key, language) DO NOTHING;
+    ('broadcast_confirm', 'uz', '📢 Xabar barcha foydalanuvchilarga yuborilsinmi?\n\n{message}');
 
+-- =============================================
 -- 📝 DEFAULT BOT TEXTS — RUSSIAN
+-- =============================================
 INSERT INTO bot_texts (text_key, language, content) VALUES
     ('welcome', 'ru', '🎁 *Добро пожаловать в Giveaway Bot!*
 
@@ -270,10 +284,11 @@ INSERT INTO bot_texts (text_key, language, content) VALUES
     ('top_referrers', 'ru', '🏆 *Топ Рефералы*
 
 {leaderboard}'),
-    ('broadcast_confirm', 'ru', '📢 Отправить сообщение всем пользователям?\n\n{message}')
-ON CONFLICT (text_key, language) DO NOTHING;
+    ('broadcast_confirm', 'ru', '📢 Отправить сообщение всем пользователям?\n\n{message}');
 
+-- =============================================
 -- 📝 DEFAULT BOT TEXTS — ENGLISH
+-- =============================================
 INSERT INTO bot_texts (text_key, language, content) VALUES
     ('welcome', 'en', '🎁 *Welcome to Giveaway Bot!*
 
@@ -343,5 +358,4 @@ Subscribe and tap "✅ Verify" again.'),
     ('top_referrers', 'en', '🏆 *Top Referrers*
 
 {leaderboard}'),
-    ('broadcast_confirm', 'en', '📢 Send this message to all users?\n\n{message}')
-ON CONFLICT (text_key, language) DO NOTHING;
+    ('broadcast_confirm', 'en', '📢 Send this message to all users?\n\n{message}');

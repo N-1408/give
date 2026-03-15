@@ -8,6 +8,10 @@
 #    This command is HIDDEN and undocumented by design.
 # 📅 Created: 2026-03-15 07:47 (Tashkent Time)
 # ============================================
+# 📋 CHANGE LOG:
+# [2026-03-15 08:26 Tashkent] - Added full channel management:
+#   add/remove/toggle channels from admin panel
+# ============================================
 
 import os
 import io
@@ -46,6 +50,11 @@ class AdminStates(StatesGroup):
     editing_text = State()          # 📝 Waiting for new text content
     broadcast_compose = State()     # 📢 Composing broadcast message
     broadcast_confirm = State()     # ✅ Confirming broadcast
+    # 📢 Channel management states
+    ch_waiting_type = State()       # 📢 Waiting for channel type
+    ch_waiting_url = State()        # 🔗 Waiting for channel URL
+    ch_waiting_name = State()       # 📛 Waiting for channel name
+    ch_waiting_id = State()         # 🆔 Waiting for Telegram channel ID
 
 
 # 🛤️ Router
@@ -464,31 +473,210 @@ async def on_broadcast_cancelled(callback: CallbackQuery, state: FSMContext, lan
 
 
 # =============================================
-# 🔄 CHANNEL SETTINGS (PLACEHOLDER)
+# 📢 CHANNEL MANAGEMENT (FULL CRUD)
 # =============================================
 
-@router.callback_query(F.data == "admin_channels")
-async def on_admin_channels(callback: CallbackQuery, lang: str = "uz"):
-    """🔄 Show channel configuration"""
-    if not await db.is_user_admin(callback.from_user.id):
-        await callback.answer("⛔", show_alert=True)
-        return
+def _build_channels_text_and_keyboard(channels):
+    """📢 Build channel list text and inline keyboard"""
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-    await callback.answer()
-    channels = await db.get_active_channels()
+    text = "📢 *Kanal sozlamalari:*\n\n"
+    buttons = []
 
-    text = "🔄 *Kanal sozlamalari:*\n\n"
     for ch in channels:
         emoji = {"telegram": "📢", "instagram": "📸", "youtube": "▶️"}.get(ch["channel_type"], "🔗")
         status = "✅" if ch.get("is_active") else "❌"
-        text += f"{emoji} {ch.get('channel_name', '—')} {status}\n"
+        ch_id = ch["id"]
+
+        text += f"{emoji} {status} *{ch.get('channel_name', '—')}* ({ch['channel_type']})\n"
         text += f"   🔗 {ch.get('channel_url', '—')}\n"
         if ch.get("channel_id"):
             text += f"   🆔 {ch['channel_id']}\n"
         text += "\n"
 
-    text += "\n_Kanal sozlamalarini o'zgartirish uchun Supabase dashboarddan foydalaning._"
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_admin_keyboard(lang))
+        # 🔄 Toggle and 🗑️ Delete buttons for each channel
+        toggle_label = "🔴 O'chirish" if ch.get("is_active") else "🟢 Yoqish"
+        buttons.append([
+            InlineKeyboardButton(text=f"{emoji} {ch.get('channel_name', '—')[:15]}", callback_data=f"ch_noop_{ch_id}"),
+            InlineKeyboardButton(text=toggle_label, callback_data=f"ch_toggle_{ch_id}"),
+            InlineKeyboardButton(text="🗑️", callback_data=f"ch_delete_{ch_id}"),
+        ])
+
+    # ➕ Add channel button
+    buttons.append([InlineKeyboardButton(text="➕ Yangi kanal qo'shish", callback_data="ch_add_new")])
+    # 🔙 Back button
+    buttons.append([InlineKeyboardButton(text="🔙 Orqaga", callback_data="admin_back")])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return text, keyboard
+
+
+@router.callback_query(F.data == "admin_channels")
+async def on_admin_channels(callback: CallbackQuery, lang: str = "uz"):
+    """📢 Show channel management panel"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    channels = await db.get_all_channels()
+    text, keyboard = _build_channels_text_and_keyboard(channels)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("ch_toggle_"))
+async def on_channel_toggle(callback: CallbackQuery, lang: str = "uz"):
+    """🔄 Toggle channel active/inactive"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    ch_db_id = int(callback.data.replace("ch_toggle_", ""))
+    new_state = await db.toggle_channel(ch_db_id)
+    status_text = "✅ Yoqildi" if new_state else "❌ O'chirildi"
+    await callback.answer(status_text, show_alert=True)
+
+    # 🔄 Refresh channel list
+    channels = await db.get_all_channels()
+    text, keyboard = _build_channels_text_and_keyboard(channels)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("ch_delete_"))
+async def on_channel_delete(callback: CallbackQuery, lang: str = "uz"):
+    """🗑️ Delete a channel"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    ch_db_id = int(callback.data.replace("ch_delete_", ""))
+    ch = await db.get_channel_by_id(ch_db_id)
+    ch_name = ch.get("channel_name", "Unknown") if ch else "Unknown"
+
+    await db.remove_channel(ch_db_id)
+    await callback.answer(f"🗑️ {ch_name} o'chirildi!", show_alert=True)
+    logger.info(f"🗑️ Channel deleted: {ch_name} (ID: {ch_db_id})")
+
+    # 🔄 Refresh channel list
+    channels = await db.get_all_channels()
+    text, keyboard = _build_channels_text_and_keyboard(channels)
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("ch_noop_"))
+async def on_channel_noop(callback: CallbackQuery):
+    """📢 No-op for channel name button"""
+    await callback.answer()
+
+
+# =============================================
+# ➕ ADD NEW CHANNEL FLOW
+# =============================================
+
+@router.callback_query(F.data == "ch_add_new")
+async def on_add_channel_start(callback: CallbackQuery, state: FSMContext, lang: str = "uz"):
+    """➕ Start adding a new channel"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    await callback.answer()
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    type_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Telegram", callback_data="ch_type_telegram")],
+        [InlineKeyboardButton(text="📸 Instagram", callback_data="ch_type_instagram")],
+        [InlineKeyboardButton(text="▶️ YouTube", callback_data="ch_type_youtube")],
+        [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="admin_channels")],
+    ])
+    await callback.message.edit_text(
+        "➕ *Yangi kanal qo'shish*\n\nKanal turini tanlang:",
+        parse_mode="Markdown", reply_markup=type_keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("ch_type_"))
+async def on_channel_type_selected(callback: CallbackQuery, state: FSMContext, lang: str = "uz"):
+    """📢 Channel type selected, ask for URL"""
+    if not await db.is_user_admin(callback.from_user.id):
+        await callback.answer("⛔", show_alert=True)
+        return
+
+    ch_type = callback.data.replace("ch_type_", "")
+    await state.update_data(new_ch_type=ch_type)
+    await callback.answer()
+
+    emoji = {"telegram": "📢", "instagram": "📸", "youtube": "▶️"}.get(ch_type, "🔗")
+    await callback.message.edit_text(
+        f"{emoji} *{ch_type.capitalize()}* kanal\n\n"
+        f"🔗 Kanal URL manzilini yuboring:\n"
+        f"_(Masalan: https://t.me/channel\_name)_",
+        parse_mode="Markdown"
+    )
+    await state.set_state(AdminStates.ch_waiting_url)
+
+
+@router.message(AdminStates.ch_waiting_url, F.text)
+async def on_channel_url_entered(message: Message, state: FSMContext, lang: str = "uz"):
+    """🔗 Channel URL entered, ask for name"""
+    await state.update_data(new_ch_url=message.text.strip())
+    await message.answer(
+        "📛 Kanal nomini yuboring:\n_(Masalan: My Channel)_",
+        parse_mode="Markdown"
+    )
+    await state.set_state(AdminStates.ch_waiting_name)
+
+
+@router.message(AdminStates.ch_waiting_name, F.text)
+async def on_channel_name_entered(message: Message, state: FSMContext, lang: str = "uz"):
+    """📛 Channel name entered, ask for Telegram ID if TG channel"""
+    await state.update_data(new_ch_name=message.text.strip())
+    state_data = await state.get_data()
+
+    if state_data.get("new_ch_type") == "telegram":
+        # 🆔 Telegram channels need a channel_id for API verification
+        await message.answer(
+            "🆔 Telegram kanal ID sini yuboring:\n"
+            "_(Masalan: @channel\_username yoki -1001234567890)_\n\n"
+            "⚠️ *Muhim:* Botni ushbu kanalga admin qilib qo'shing!",
+            parse_mode="Markdown"
+        )
+        await state.set_state(AdminStates.ch_waiting_id)
+    else:
+        # 📸/▶️ Instagram/YouTube don't need channel_id
+        await _save_new_channel(message, state, lang)
+
+
+@router.message(AdminStates.ch_waiting_id, F.text)
+async def on_channel_id_entered(message: Message, state: FSMContext, lang: str = "uz"):
+    """🆔 Telegram channel ID entered, save channel"""
+    await state.update_data(new_ch_id=message.text.strip())
+    await _save_new_channel(message, state, lang)
+
+
+async def _save_new_channel(message: Message, state: FSMContext, lang: str = "uz"):
+    """💾 Save the new channel to database"""
+    state_data = await state.get_data()
+    ch_type = state_data.get("new_ch_type", "telegram")
+    ch_url = state_data.get("new_ch_url", "")
+    ch_name = state_data.get("new_ch_name", "")
+    ch_id = state_data.get("new_ch_id")
+
+    await db.add_channel(
+        channel_type=ch_type,
+        channel_url=ch_url,
+        channel_name=ch_name,
+        channel_id=ch_id
+    )
+
+    logger.info(f"➕ New channel added: {ch_type} - {ch_name} ({ch_url})")
+
+    # ✅ Show success and go back to channel list
+    channels = await db.get_all_channels()
+    text, keyboard = _build_channels_text_and_keyboard(channels)
+    success_text = f"✅ *{ch_name}* kanali qo'shildi!\n\n{text}"
+    await message.answer(success_text, parse_mode="Markdown", reply_markup=keyboard)
+    await state.clear()
 
 
 # =============================================
