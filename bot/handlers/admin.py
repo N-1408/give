@@ -97,12 +97,20 @@ async def on_password_entered(message: Message, state: FSMContext, lang: str = "
     """🔐 Verify admin password"""
     if message.text == config.ADMIN_PASSWORD:
         # ✅ Correct password → make admin
+        # Save user to DB first just in case they skipped /start registration
+        await db.save_user(
+            telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name,
+            language=lang
+        )
         await db.set_admin(message.from_user.id, True)
         logger.info(f"👑 New admin: {message.from_user.id} ({message.from_user.first_name})")
 
         # 👑 Show admin reply keyboard
         await message.answer(
-            "👑 *Xush kelibsiz, Shep!*",
+            "👑 <b>Xush kelibsiz, Shep!</b>",
             parse_mode="HTML",
             reply_markup=get_admin_menu_keyboard(lang)
         )
