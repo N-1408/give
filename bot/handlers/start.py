@@ -58,9 +58,9 @@ async def cmd_start_with_referral(message: Message, command: CommandObject, stat
     # 💾 Save referrer_id in FSM state
     await state.update_data(referrer_id=referrer_id)
 
-    # 🔍 Check if user already exists and is verified
+    # 🔍 Check if user already exists and has a phone
     existing_user = await db.get_user(message.from_user.id)
-    if existing_user and existing_user.get("is_verified"):
+    if existing_user and existing_user.get("phone"):
         lang = existing_user.get("language", "uz")
         text = await get_message("already_registered", lang)
         await message.answer(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard(lang))
@@ -76,9 +76,9 @@ async def cmd_start_with_referral(message: Message, command: CommandObject, stat
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     """🚀 Handle /start without referral"""
-    # 🔍 Check if user already exists and is verified
+    # 🔍 Check if user already exists and has a phone
     existing_user = await db.get_user(message.from_user.id)
-    if existing_user and existing_user.get("is_verified"):
+    if existing_user and existing_user.get("phone"):
         lang = existing_user.get("language", "uz")
         text = await get_message("already_registered", lang)
         await message.answer(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard(lang))

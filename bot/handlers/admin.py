@@ -657,8 +657,22 @@ async def on_channel_name_entered(message: Message, state: FSMContext, lang: str
 
 @router.message(AdminStates.ch_waiting_id, F.text)
 async def on_channel_id_entered(message: Message, state: FSMContext, lang: str = "uz"):
-    """🆔 Telegram channel ID entered, save channel"""
-    await state.update_data(new_ch_id=message.text.strip())
+    """🆔 Telegram channel ID entered, validate and save channel"""
+    ch_id = message.text.strip()
+    
+    # 🔍 Validate channel with Telegram API First
+    try:
+        await message.bot.get_chat(ch_id)
+    except Exception as e:
+        await message.answer(
+            f"❌ <b>Xato kanal ID yoki bot admin emas!</b>\n\n"
+            f"Qaytadan tekshirib yuboring (Masalan: <code>@username</code> yoki <code>-100...</code>)\n"
+            f"Xatolik: {e}",
+            parse_mode="HTML"
+        )
+        return
+
+    await state.update_data(new_ch_id=ch_id)
     await _save_new_channel(message, state, lang)
 
 
