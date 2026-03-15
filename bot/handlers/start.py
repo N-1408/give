@@ -96,7 +96,7 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
 # =============================================
 
 @router.callback_query(F.data.startswith("lang_"))
-async def on_language_selected(callback: CallbackQuery, state: FSMContext):
+async def on_language_selected(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """🌐 Handle language selection"""
     lang = callback.data.replace("lang_", "")
 
@@ -106,7 +106,24 @@ async def on_language_selected(callback: CallbackQuery, state: FSMContext):
     # ✅ Answer callback
     await callback.answer()
 
-    # 📱 Ask for contact
+    # 🔍 Check if user already exists and has a phone
+    user = await db.get_user(callback.from_user.id)
+    if user and user.get("phone"):
+        # 🔄 Update existing user's language
+        await db.update_user_field(user.id, "language", lang)
+        
+        # 📝 Send success message and new menu
+        from bot.keyboards.keyboards import get_main_menu_keyboard
+        texts = {"uz": "✅ Til o'zgartirildi", "ru": "✅ Язык изменен", "en": "✅ Language changed"}
+        await callback.message.delete() # Remove inline keyboard
+        await callback.message.answer(
+            texts.get(lang, texts["uz"]),
+            parse_mode="HTML",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+        return
+
+    # 📱 Ask for contact (New user)
     text = await get_message("ask_contact", lang)
     await callback.message.answer(
         text,

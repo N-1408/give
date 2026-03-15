@@ -111,14 +111,17 @@ def get_main_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
         "uz": [
             ["🎟️ Mening imkoniyatlarim", "🔗 Referal linkim"],
             ["📋 Qoidalar", "🎁 Sovrinlar"],
+            ["🏆 Top Referallar", "⚙️ Sozlamalar"],
         ],
         "ru": [
             ["🎟️ Мои шансы", "🔗 Моя реферальная ссылка"],
             ["📋 Правила", "🎁 Призы"],
+            ["🏆 Топ Рефералов", "⚙️ Настройки"],
         ],
         "en": [
             ["🎟️ My chances", "🔗 My referral link"],
             ["📋 Rules", "🎁 Prizes"],
+            ["🏆 Top Referrals", "⚙️ Settings"],
         ]
     }
 
@@ -234,6 +237,7 @@ def get_text_keys_keyboard() -> InlineKeyboardMarkup:
         ("prizes", "🎁 Sovrinlar"),
         ("already_registered", "⚠️ Ro'yxatdan o'tgan"),
         ("not_verified", "❌ Tasdiqlanmagan"),
+        ("top_referrers", "🏆 Top Referallar"),
         ("stats_message", "📊 Bot statistikasi"),
     ]
     buttons = [

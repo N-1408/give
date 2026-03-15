@@ -261,24 +261,24 @@ async def get_referral_count(telegram_id: int) -> int:
 # =============================================
 
 async def get_top_referrers(limit: int = 10) -> List[dict]:
-    """🏆 Get top referrers leaderboard"""
+    """🏆 Get top referrers list with user details and count"""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT 
-                u.telegram_id,
-                u.first_name,
-                u.last_name,
+                u.telegram_id, 
+                u.first_name, 
+                u.last_name, 
                 u.username,
-                COUNT(c.id) as referral_count
+                COUNT(c.id) as ref_count
             FROM users u
-            JOIN codes c ON c.user_id = u.telegram_id AND c.code_type = 'referral'
-            GROUP BY u.telegram_id, u.first_name, u.last_name, u.username
-            ORDER BY referral_count DESC
+            JOIN codes c ON u.telegram_id = c.referred_user_id
+            WHERE c.code_type = 'referral'
+            GROUP BY u.telegram_id
+            ORDER BY ref_count DESC
             LIMIT $1
         """, limit)
         return [dict(row) for row in rows]
-
 
 # =============================================
 # 📝 BOT TEXTS OPERATIONS

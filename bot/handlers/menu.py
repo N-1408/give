@@ -27,6 +27,7 @@ from bot.keyboards.keyboards import (
     get_confirm_broadcast_keyboard,
     get_admin_menu_keyboard,
     get_share_referral_keyboard,
+    get_language_keyboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,60 @@ async def on_prizes(message: Message, lang: str = "uz"):
         await message.answer_photo(photo=image_id, caption=content, parse_mode="HTML")
     else:
         await message.answer(content, parse_mode="HTML")
+
+
+# =============================================
+# ⚙️ SETTINGS
+# =============================================
+
+@router.message(F.text.in_({
+    "⚙️ Sozlamalar", "⚙️ Настройки", "⚙️ Settings"
+}))
+async def on_settings(message: Message, lang: str = "uz"):
+    """⚙️ Show settings menu (Language selection)"""
+    user_id = message.from_user.id
+    if not await _require_verification(user_id, message.bot, message, lang):
+        return
+
+    text = "🌐 <b>Tilni tanlang | Выберите язык | Choose language:</b>"
+    await message.answer(text, parse_mode="HTML", reply_markup=get_language_keyboard())
+
+
+# =============================================
+# 🏆 TOP REFERRALS (LEADERBOARD)
+# =============================================
+
+@router.message(F.text.in_({
+    "🏆 Top Referallar", "🏆 Топ Рефералов", "🏆 Top Referrals"
+}))
+async def on_top_referrers(message: Message, lang: str = "uz"):
+    """🏆 Show top referrers leaderboard"""
+    user_id = message.from_user.id
+    if not await _require_verification(user_id, message.bot, message, lang):
+        return
+
+    top_users = await db.get_top_referrers(10)
+    
+    if not top_users:
+        text = await get_message("top_referrers", lang)
+        text += "\n\n<i>Hozircha hech kim do'stlarini taklif qilmadi. Birinchi bo'ling!</i>"
+        await message.answer(text, parse_mode="HTML")
+        return
+
+    # 📝 Format leaderboard
+    leaderboard = []
+    medals = ["🥇", "🥈", "🥉"]
+    
+    for i, user in enumerate(top_users):
+        rank = medals[i] if i < 3 else f"{i+1}."
+        name = user.get('first_name') or user.get('username') or f"User {user.get('telegram_id')}"
+        count = user.get('ref_count', 0)
+        leaderboard.append(f"{rank} <b>{name}</b> — {count} ta taklif")
+
+    header = await get_message("top_referrers", lang)
+    text = f"{header}\n\n" + "\n".join(leaderboard)
+    
+    await message.answer(text, parse_mode="HTML")
 
 
 # =============================================
