@@ -34,6 +34,25 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+async def _require_verification(user_id: int, bot: Bot, message: Message, lang: str) -> bool:
+    """✅ Helper to check if user is still verified before allowing action"""
+    from bot.handlers.verification import check_user_subscriptions
+    from bot.keyboards.keyboards import get_channels_keyboard
+    
+    is_verified = await check_user_subscriptions(user_id, bot)
+    if not is_verified:
+        await db.update_user_field(user_id, "is_verified", False)
+        text = await get_message("not_verified", lang)
+        # We don't have detailed missing_channels here, so we just pass an empty string 
+        # or a generic message. The get_message will handle it if we pass it or ignore it.
+        text = text.format(missing_channels="") if "{missing_channels}" in text else text
+        
+        channels = await db.get_active_channels()
+        await message.answer(text, parse_mode="HTML", reply_markup=get_channels_keyboard(channels, lang))
+        return False
+    return True
+
+
 # =============================================
 # 🎟️ MY CHANCES
 # =============================================
@@ -44,6 +63,9 @@ router = Router()
 async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
     """🎟️ Show user's codes and chances count"""
     user_id = message.from_user.id
+    
+    if not await _require_verification(user_id, bot, message, lang):
+        return
 
     # 📋 Get user codes
     codes = await db.get_user_codes(user_id)
@@ -76,6 +98,10 @@ async def on_my_chances(message: Message, bot: Bot, lang: str = "uz"):
 async def on_referral_link(message: Message, bot: Bot, lang: str = "uz"):
     """🔗 Show user's referral link"""
     user_id = message.from_user.id
+
+    if not await _require_verification(user_id, bot, message, lang):
+        return
+
     referral_link = await create_start_link(bot, f"ref_{user_id}")
 
     text = await get_message("referral_info", lang, referral_link=referral_link)
@@ -91,6 +117,10 @@ async def on_referral_link(message: Message, bot: Bot, lang: str = "uz"):
 }))
 async def on_rules(message: Message, lang: str = "uz"):
     """📋 Show giveaway rules"""
+    user_id = message.from_user.id
+    if not await _require_verification(user_id, message.bot, message, lang):
+        return
+
     content, image_id = await get_text_with_image("rules", lang)
 
     if image_id:
@@ -108,6 +138,10 @@ async def on_rules(message: Message, lang: str = "uz"):
 }))
 async def on_prizes(message: Message, lang: str = "uz"):
     """🎁 Show prizes info"""
+    user_id = message.from_user.id
+    if not await _require_verification(user_id, message.bot, message, lang):
+        return
+
     content, image_id = await get_text_with_image("prizes", lang)
 
     if image_id:

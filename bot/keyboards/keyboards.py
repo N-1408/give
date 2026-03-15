@@ -211,7 +211,6 @@ def get_text_keys_keyboard() -> InlineKeyboardMarkup:
         ("prizes", "🎁 Sovrinlar"),
         ("already_registered", "⚠️ Ro'yxatdan o'tgan"),
         ("not_verified", "❌ Tasdiqlanmagan"),
-        ("top_referrers", "🏆 Top Referallar"),
         ("stats_message", "📊 Bot statistikasi"),
     ]
     buttons = [

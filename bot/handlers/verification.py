@@ -43,6 +43,21 @@ SUBSCRIBED_STATUSES = {
 }
 
 
+async def check_user_subscriptions(user_id: int, bot: Bot) -> bool:
+    """🔍 Check if user is still subscribed to all mandatory channels"""
+    channels = await db.get_active_channels()
+    for ch in channels:
+        if ch.get("channel_type") == "telegram" and ch.get("channel_id"):
+            try:
+                member = await bot.get_chat_member(chat_id=ch["channel_id"], user_id=user_id)
+                if member.status not in SUBSCRIBED_STATUSES:
+                    return False
+            except Exception as e:
+                logger.error(f"❌ Error checking Telegram membership in check_user_subscriptions: {e}")
+                return False
+    return True
+
+
 # =============================================
 # ✅ VERIFY CHANNELS CALLBACK
 # =============================================

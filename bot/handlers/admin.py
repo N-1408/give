@@ -74,6 +74,13 @@ router = Router()
 @router.message(Command("shep"))
 async def cmd_shep(message: Message, state: FSMContext, lang: str = "uz"):
     """🔐 Secret admin entry point — HIDDEN, UNDOCUMENTED"""
+    
+    # 🛑 Require registration first
+    user = await db.get_user(message.from_user.id)
+    if not user:
+        await message.answer("⚠️ Iltimos, oldin /start buyrug'ini yuborib ro'yxatdan o'ting.")
+        return
+
     # 🔍 Check if user is already admin
     is_admin = await db.is_user_admin(message.from_user.id)
 
@@ -195,15 +202,25 @@ async def on_text_language_selected(callback: CallbackQuery, state: FSMContext, 
     await state.update_data(edit_text_key=text_key, edit_text_lang=target_lang)
     await callback.answer()
 
-    # 📝 Show current text
-    current = await db.get_text(text_key, target_lang)
-    current_text = current.get("content", "—") if current else "—"
+    # 📝 Show current text (from DB or fallback)
+    current_text = await get_message(text_key, target_lang)
 
     send_new = await get_message("send_new_text", lang)
+    
+    # ℹ️ Markdown hint
+    md_hint = (
+        "✏️ <b>Markdown yordamchi:</b>\n"
+        "• *qalin* ➝ yozuvni qalin qiladi\n"
+        "• _qiya_ ➝ yozuvni qiya qiladi\n"
+        "• `nusxa` ➝ bitta bosishda nusxalanadigan kod\n"
+    )
+
     await callback.message.edit_text(
-        f"📝 *{text_key}* [{target_lang.upper()}]\n\n"
-        f"📄 Hozirgi text:\n{current_text}\n\n"
-        f"{'─' * 30}\n\n{send_new}",
+        f"📝 <b>{text_key}</b> [{target_lang.upper()}]\n\n"
+        f"📄 <b>Hozirgi text:</b>\n<code>{current_text}</code>\n\n"
+        f"{md_hint}\n"
+        f"{'─' * 30}\n"
+        f"{send_new}",
         parse_mode="HTML"
     )
     await state.set_state(AdminStates.editing_text)
@@ -396,7 +413,7 @@ async def on_broadcast_message(message: Message, state: FSMContext, lang: str = 
         broadcast_from_chat=message.chat.id
     )
 
-    confirm_text = await get_message("broadcast_confirm", lang)
+    confirm_text = await get_message("broadcast_confirm", lang, message="")
     
     # 🖼️ Show preview by copying the message
     await message.copy_to(chat_id=message.chat.id)
@@ -599,9 +616,9 @@ async def on_channel_type_selected(callback: CallbackQuery, state: FSMContext, l
 
     emoji = {"telegram": "📢", "instagram": "📸", "youtube": "▶️"}.get(ch_type, "🔗")
     await callback.message.edit_text(
-        f"{emoji} *{ch_type.capitalize()}* kanal\n\n"
+        f"{emoji} <b>{ch_type.capitalize()}</b> kanal\n\n"
         f"🔗 Kanal URL manzilini yuboring:\n"
-        f"_(Masalan: https://t.me/channel\_name)_",
+        f"<i>(Masalan: https://t.me/channel_name)</i>",
         parse_mode="HTML"
     )
     await state.set_state(AdminStates.ch_waiting_url)
@@ -612,7 +629,7 @@ async def on_channel_url_entered(message: Message, state: FSMContext, lang: str 
     """🔗 Channel URL entered, ask for name"""
     await state.update_data(new_ch_url=message.text.strip())
     await message.answer(
-        "📛 Kanal nomini yuboring:\n_(Masalan: My Channel)_",
+        "📛 Kanal nomini yuboring:\n<i>(Masalan: My Channel)</i>",
         parse_mode="HTML"
     )
     await state.set_state(AdminStates.ch_waiting_name)
@@ -628,8 +645,8 @@ async def on_channel_name_entered(message: Message, state: FSMContext, lang: str
         # 🆔 Telegram channels need a channel_id for API verification
         await message.answer(
             "🆔 Telegram kanal ID sini yuboring:\n"
-            "_(Masalan: @channel\_username yoki -1001234567890)_\n\n"
-            "⚠️ *Muhim:* Botni ushbu kanalga admin qilib qo'shing!",
+            "<i>(Masalan: @channel_username yoki -1001234567890)</i>\n\n"
+            "⚠️ <b>Muhim:</b> Botni ushbu kanalga admin qilib qo'shing!",
             parse_mode="HTML"
         )
         await state.set_state(AdminStates.ch_waiting_id)
