@@ -26,6 +26,7 @@ from bot.keyboards.keyboards import (
     get_text_keys_keyboard,
     get_confirm_broadcast_keyboard,
     get_admin_menu_keyboard,
+    get_share_referral_keyboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,11 @@ async def on_referral_link(message: Message, bot: Bot, lang: str = "uz"):
     referral_link = await create_start_link(bot, f"ref_{user_id}")
 
     text = await get_message("referral_info", lang, referral_link=referral_link)
-    await message.answer(text, parse_mode="HTML")
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_share_referral_keyboard(referral_link, lang)
+    )
 
 
 # =============================================
