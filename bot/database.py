@@ -9,8 +9,10 @@
 # ============================================
 # 📋 CHANGE LOG:
 # [2026-03-15 08:26 Tashkent] - Added channel add/remove/toggle functions
-# [2026-03-15 08:41 Tashkent] - Fixed Render connection: added SSL support
-#   and retry mechanism for Supabase connection
+# [2026-03-15 08:41 Tashkent] - Added SSL support
+# [2026-03-15 08:48 Tashkent] - Fixed IPv4/IPv6: use Session Pooler with
+#   statement_cache_size=0 (Render free tier is IPv4-only, Supabase direct
+#   connection is IPv6-only, Session Pooler supports IPv4)
 # ============================================
 
 import ssl
@@ -40,7 +42,11 @@ def _create_ssl_context():
 
 
 async def init_db():
-    """🔌 Initialize the database connection pool with SSL + retry"""
+    """🔌 Initialize the database connection pool with SSL + retry
+    
+    ⚠️ IMPORTANT: Uses statement_cache_size=0 because Supabase Session
+    Pooler (required for IPv4/Render) doesn't support prepared statements.
+    """
     global _pool
     max_retries = 3
 
@@ -48,10 +54,14 @@ async def init_db():
         try:
             _pool = await asyncpg.create_pool(
                 dsn=config.SUPABASE_DB_URL,
-                min_size=2,
-                max_size=10,
+                min_size=1,
+                max_size=5,
                 command_timeout=30,
-                ssl=_create_ssl_context()  # 🔒 SSL required for Supabase
+                ssl=_create_ssl_context(),             # 🔒 SSL required for Supabase
+                statement_cache_size=0,                 # ⚠️ Disable prepared statements (Session Pooler)
+                server_settings={
+                    'search_path': 'public',            # 📋 Ensure correct schema
+                }
             )
             logger.info("✅ Database connection pool created successfully")
             return
