@@ -168,15 +168,15 @@ def get_admin_menu_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
 def get_share_referral_keyboard(referral_link: str, language: str = "uz") -> InlineKeyboardMarkup:
     """🔗 Inline keyboard with a direct share button for Telegram chats"""
     texts = {
-        "uz": ("Do'stlarga ulashish 📤", "Salom! Men ajoyib yutuqli o'yinda qatnashyapman.\nSen ham qo'shil va yutuqlarni yutib ol! 👇"),
-        "ru": ("Поделиться с друзьями 📤", "Привет! Я участвую в крутом розыгрыше.\nПрисоединяйся и выигрывай призы! 👇"),
-        "en": ("Share with friends 📤", "Hi! I am participating in an awesome giveaway.\nJoin in and win prizes! 👇"),
+        "uz": ("Do'stlarga ulashish 📤", "Assalomu alaykum! Ushbu botda ro'yxatdan o'tib turli qimmatbaho sovg'alarni yutib oling! 👇"),
+        "ru": ("Поделиться с друзьями 📤", "Здравствуйте! Зарегистрируйтесь в этом боте и выигрывайте ценные призы! 👇"),
+        "en": ("Share with friends 📤", "Hello! Register in this bot and win various valuable prizes! 👇"),
     }
     btn_text, share_text = texts.get(language, texts["uz"])
     
     # URL encoded share link for Telegram
     import urllib.parse
-    encoded_text = urllib.parse.quote_plus(f"{share_text}\n\n{referral_link}")
+    encoded_text = urllib.parse.quote(f"{share_text}\n\n{referral_link}")
     share_url = f"https://t.me/share/url?url={referral_link}&text={encoded_text}"
     
     return InlineKeyboardMarkup(

@@ -71,68 +71,6 @@ _last_broadcast = {"messages": []}  # [{"chat_id": ..., "message_id": ...}, ...]
 
 
 # =============================================
-# 🧹 EMERGENCY /ZAPAL COMMAND (Brute-force delete recent bot messages)
-# =============================================
-
-@router.message(Command("zapal"))
-async def cmd_cleanup(message: Message, bot: Bot, lang: str = "uz"):
-    """🧹 Emergency: try to delete the last N messages bot sent to all users"""
-    if not await db.is_user_admin(message.from_user.id):
-        return
-
-    user_ids = await db.get_all_user_ids()
-    total_deleted = 0
-    total_failed = 0
-
-    status_msg = await message.answer(
-        f"🧹 <b>Tozalash boshlandi...</b>\n"
-        f"Har bir userning oxirgi 50 ta xabar ID sini sinab ko'raman.\n"
-        f"Users: {len(user_ids)}",
-        parse_mode="HTML"
-    )
-
-    for uid in user_ids:
-        # 🔍 Try message IDs in a wide recent range
-        # We try from a high number downwards
-        for offset in range(1, 51):
-            try:
-                # Try to send a dummy message to find approximately the latest message ID
-                # then delete backwards from there
-                pass
-            except Exception:
-                pass
-
-        # Alternative: try deleting by message_id directly
-        # Telegram private chat message IDs are relatively small sequential numbers
-        # We try a smart range based on a probe
-        try:
-            probe = await bot.send_message(uid, ".")
-            latest_id = probe.message_id
-            await bot.delete_message(uid, latest_id)  # Delete the probe
-
-            # Now try deleting backwards from the latest ID
-            for msg_id in range(latest_id - 1, max(latest_id - 51, 0), -1):
-                try:
-                    await bot.delete_message(uid, msg_id)
-                    total_deleted += 1
-                except Exception:
-                    total_failed += 1
-
-        except Exception as e:
-            logger.debug(f"🧹 Probe failed for {uid}: {e}")
-
-        await asyncio.sleep(0.5)  # Rate limit
-
-    await status_msg.edit_text(
-        f"✅ <b>Tozalash tugadi!</b>\n\n"
-        f"🗑️ O'chirildi: {total_deleted}\n"
-        f"❌ O'chirib bo'lmadi: {total_failed}\n\n"
-        f"<i>Eslatma: Bot faqat o'zi yuborgan xabarlarni o'chira oladi.</i>",
-        parse_mode="HTML"
-    )
-
-
-# =============================================
 # 🔐 SECRET /SHEP COMMAND (HIDDEN)
 # =============================================
 

@@ -274,7 +274,7 @@ async def get_top_referrers(limit: int = 10) -> List[dict]:
             FROM users u
             JOIN codes c ON c.user_id = u.telegram_id
             WHERE c.code_type = 'referral'
-            GROUP BY u.telegram_id
+            GROUP BY u.telegram_id, u.first_name, u.last_name, u.username
             ORDER BY ref_count DESC
             LIMIT $1
         """, limit)
